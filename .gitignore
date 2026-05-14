@@ -1,0 +1,12 @@
+# all Java .class files
+*.class
+src/*.class
+src/syntaxtree/*.class
+src/visitor/*.class
+
+# VS Code settings
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
