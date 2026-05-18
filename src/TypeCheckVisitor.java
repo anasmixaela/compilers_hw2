@@ -1,5 +1,6 @@
 import syntaxtree.*;
 import visitor.GJDepthFirst;
+import java.util.*;
 
 public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     private SymbolTable st;
@@ -87,13 +88,102 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         return null;
     }
 
-    // types return values
+    // specific expressions found in your syntaxtree
+    @Override
+    public String visit(TimesExpression n, String argu) {
+        String t1 = n.f0.accept(this, argu);
+        String t2 = n.f2.accept(this, argu);
+        if (!"int".equals(t1) || !"int".equals(t2)) {
+            System.err.println("Error: Multiplication requires integers.");
+            System.exit(1);
+        }
+        return "int";
+    }
+
+    @Override
+    public String visit(MinusExpression n, String argu) {
+        String t1 = n.f0.accept(this, argu);
+        String t2 = n.f2.accept(this, argu);
+        if (!"int".equals(t1) || !"int".equals(t2)) {
+            System.err.println("Error: Subtraction requires integers.");
+            System.exit(1);
+        }
+        return "int";
+    }
+
+    @Override
+    public String visit(CompareExpression n, String argu) {
+        String t1 = n.f0.accept(this, argu);
+        String t2 = n.f2.accept(this, argu);
+        if (!"int".equals(t1) || !"int".equals(t2)) {
+            System.err.println("Error: Comparison requires integers.");
+            System.exit(1);
+        }
+        return "boolean";
+    }
+
+    @Override
+    public String visit(IfStatement n, String argu) {
+        String cond = n.f2.accept(this, argu);
+        if (!"boolean".equals(cond)) {
+            System.err.println("Error: If condition must be boolean.");
+            System.exit(1);
+        }
+        n.f4.accept(this, argu);
+        n.f6.accept(this, argu);
+        return null;
+    }
+
+    @Override
+    public String visit(AllocationExpression n, String argu) {
+        return n.f1.f0.tokenImage;
+    }
+
+    @Override
+    public String visit(MessageSend n, String argu) {
+        String objType = n.f0.accept(this, argu);
+        String mName = n.f2.f0.tokenImage;
+
+        ClassInfo ci = st.classes.get(objType);
+        if (ci == null) {
+            System.err.println("Error: Class " + objType + " not found.");
+            System.exit(1);
+        }
+
+        MethodInfo mi = null;
+        String current = objType;
+        while (current != null) {
+            ClassInfo lookup = st.classes.get(current);
+            if (lookup != null && lookup.methods.containsKey(mName)) {
+                mi = lookup.methods.get(mName);
+                break;
+            }
+            current = (lookup != null) ? lookup.parent : null;
+        }
+
+        if (mi == null) {
+            System.err.println("Error: Method " + mName + " not found in class " + objType);
+            System.exit(1);
+        }
+
+        return mi.returnType;
+    }
+
+    // generic expressions unboxing
+    @Override public String visit(Expression n, String argu) { return n.f0.accept(this, argu); }
+    @Override public String visit(PrimaryExpression n, String argu) { return n.f0.accept(this, argu); }
+
+    // safe literal evaluations matching your exact jtb types
+    @Override public String visit(IntegerLiteral n, String argu) { return "int"; }
+    @Override public String visit(TrueLiteral n, String argu) { return "boolean"; }
+    @Override public String visit(FalseLiteral n, String argu) { return "boolean"; }
+
+    // types mappings
     @Override public String visit(Type n, String argu) { return n.f0.accept(this, argu); }
     @Override public String visit(IntegerType n, String argu) { return "int"; }
     @Override public String visit(BooleanType n, String argu) { return "boolean"; }
     @Override public String visit(ArrayType n, String argu) { return "int[]"; }
     
-    // identifiers evaluate to types based on context
     @Override public String visit(Identifier n, String argu) {
         if (argu != null && argu.contains(":")) {
             String[] parts = argu.split(":");
@@ -101,4 +191,8 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         }
         return n.f0.tokenImage;
     }
+
+    // structural node choices handled without explicit overrides to prevent compiler type erasure issues
+    public String visit(NodeChoice n, String argu) { return n.choice.accept(this, argu); }
+    public String visit(NodeToken n, String argu) { return n.tokenImage; }
 }
