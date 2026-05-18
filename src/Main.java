@@ -16,9 +16,15 @@ public class Main {
                 
                 MyVisitor collector = new MyVisitor();
                 root.accept(collector); 
+
+                // get the populated symbol table
+                SymbolTable st = collector.st;
+
+                // start of second pass: type checking
+                TypeCheckVisitor typeChecker = new TypeCheckVisitor(st);
+                root.accept(typeChecker, null);
                 
                 System.out.println("----------- Offsets for " + file + " -----------");
-                SymbolTable st = collector.st;
                 
                 for (ClassInfo ci : st.classes.values()) {
                     // print field offsets
