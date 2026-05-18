@@ -1,6 +1,7 @@
 import java.util.*;
 
 public class SymbolTable {
+    // map for storing class definitions
     public Map<String, ClassInfo> classes = new LinkedHashMap<>();
 
     public void addClass(String name, String parent) {
@@ -10,6 +11,13 @@ public class SymbolTable {
         }
         classes.put(name, new ClassInfo(name, parent));
     }
+
+    // return type size in bytes
+    public int getTypeSize(String type) {
+        if (type.equals("int")) return 4;
+        if (type.equals("boolean")) return 1;
+        return 8; // arrays and object pointers
+    }
 }
 
 class ClassInfo { 
@@ -17,6 +25,15 @@ class ClassInfo {
     public String parent;
     public Map<String, String> fields = new LinkedHashMap<>();
     public Map<String, MethodInfo> methods = new LinkedHashMap<>();
+    
+    // tracks variable offsets
+    public Map<String, Integer> fieldOffsets = new LinkedHashMap<>();
+    // tracks method offsets
+    public Map<String, Integer> methodOffsets = new LinkedHashMap<>();
+    
+    // next available positions
+    public int nextFieldOffset = 0;
+    public int nextMethodOffset = 0;
     
     public ClassInfo(String name, String parent) {
         this.name = name;
@@ -27,8 +44,10 @@ class ClassInfo {
 class MethodInfo {
     public String name;
     public String returnType;
-    public List<String> params = new ArrayList<>();
-    public Map<String, String> locals = new LinkedHashMap<>();
+    // ordered parameter types
+    public List<String> params = new ArrayList<>(); 
+    // local variables map
+    public Map<String, String> locals = new LinkedHashMap<>(); 
 
     public MethodInfo(String name, String returnType) {
         this.name = name;
