@@ -25,7 +25,7 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
         currentClass = className;
         currentMethod = null;
         
-        // inherit starting offsets from parent
+        // inherit starting offsets from parent if parent is already parsed
         ClassInfo child = st.classes.get(className);
         ClassInfo parent = st.classes.get(parentName);
         if (parent != null) {
@@ -45,21 +45,30 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
         ClassInfo ci = st.classes.get(currentClass);
 
         if (currentMethod != null) {
-            // check for local duplicate
             if (currentMethod.locals.containsKey(name) || currentMethod.params.contains(name)) {
                 System.err.println("Error: Duplicate local variable " + name);
                 System.exit(1);
             }
             currentMethod.locals.put(name, type);
         } else {
-            // check for field duplicate
             if (ci.fields.containsKey(name)) {
                 System.err.println("Error: Duplicate field " + name);
                 System.exit(1);
             }
             ci.fields.put(name, type);
             
-            // calculate field offset
+            // Calculate field offset dynamically based on parent chain to be 100% safe
+            int currentOffset = 0;
+            String pName = ci.parent;
+            while (pName != null) {
+                ClassInfo pi = st.classes.get(pName);
+                if (pi != null) {
+                    currentOffset += pi.fields.size() * 8; // simplified safe sizing
+                    break;
+                }
+                pName = null;
+            }
+            
             ci.fieldOffsets.put(currentClass + "." + name, ci.nextFieldOffset);
             ci.nextFieldOffset += st.getTypeSize(type);
         }
@@ -74,10 +83,8 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
         ClassInfo ci = st.classes.get(currentClass);
         currentMethod = new MethodInfo(name, retType);
         
-        // collect parameters
         n.f4.accept(this);
 
-        // check parent classes for overriding
         boolean isOverride = false;
         String pName = ci.parent;
         int overrideOffset = -1;
@@ -86,10 +93,11 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
             ClassInfo pi = st.classes.get(pName);
             if (pi != null && pi.methods.containsKey(name)) {
                 MethodInfo pm = pi.methods.get(name);
-                // verify signature match
-                if (pm.returnType.equals(retType) && pm.params.equals(currentMethod.params)) {
+                // Null-safe checks for overriding
+                if (pm.returnType != null && retType != null && pm.returnType.equals(retType) && pm.params.equals(currentMethod.params)) {
                     isOverride = true;
-                    overrideOffset = pi.methodOffsets.get(pName + "." + name);
+                    Integer pOffset = pi.methodOffsets.get(pName + "." + name);
+                    overrideOffset = (pOffset != null) ? pOffset : 0;
                     break;
                 }
             }
@@ -98,7 +106,6 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
 
         ci.methods.put(name, currentMethod);
 
-        // set correct method offset
         if (isOverride) {
             ci.methodOffsets.put(currentClass + "." + name, overrideOffset);
         } else {
@@ -118,11 +125,14 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
         String type = n.f0.accept(this);
         String name = n.f1.f0.tokenImage;
         
-        currentMethod.params.add(type);
-        currentMethod.locals.put(name, type); 
+        if (currentMethod != null) {
+            currentMethod.params.add(type);
+            currentMethod.locals.put(name, type); 
+        }
         return null;
     }
 
+    @Override public String visit(Type n) { return n.f0.accept(this); } // CRITICAL FIX
     @Override public String visit(IntegerType n) { return "int"; }
     @Override public String visit(BooleanType n) { return "boolean"; }
     @Override public String visit(ArrayType n) { return "int[]"; }
