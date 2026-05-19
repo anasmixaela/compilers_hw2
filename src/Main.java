@@ -9,18 +9,26 @@ public class Main {
             return;
         }
 
+        MiniJavaParser parser = null;
+
         for (String file : args) {
             try (FileInputStream fis = new FileInputStream(file)) {
-                MiniJavaParser parser = new MiniJavaParser(fis);
+                // JTB/JavaCC Safe Multi-file handling using ReInit
+                if (parser == null) {
+                    parser = new MiniJavaParser(fis);
+                } else {
+                    parser.ReInit(fis);
+                }
+
                 Goal root = parser.Goal(); 
                 
+                // Fresh pass 1: Symbol collection
                 MyVisitor collector = new MyVisitor();
                 root.accept(collector); 
 
-                // get the populated symbol table
                 SymbolTable st = collector.st;
 
-                // start of second pass: type checking
+                // Fresh pass 2: Type checking
                 TypeCheckVisitor typeChecker = new TypeCheckVisitor(st);
                 root.accept(typeChecker, null);
                 
