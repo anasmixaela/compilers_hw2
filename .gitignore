@@ -10,3 +10,6 @@ src/visitor/*.class
 # OS files
 .DS_Store
 Thumbs.db
+
+official-tests/
+minijava-examples-2026.zip

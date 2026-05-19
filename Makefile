@@ -6,10 +6,10 @@ default:
 clean:
 	rm -f src/*.class src/syntaxtree/*.class src/visitor/*.class
 
-# execute the compiler with the factorial example directly from windows path
+# run a single test (Factorial)
 run-factorial: default
-	java -cp src Main /mnt/d/diiiit/6th/compilers/compilers_hw2/minijava-examples-new/Factorial.java
+	java -cp src Main official-tests/minijava-examples-new/Factorial.java
 
-# execute all new examples at once (as requested in question 8)
+# execute all new valid examples at once
 run-all: default
-	java -cp src Main /mnt/d/diiiit/6th/compilers/compilers_hw2/minijava-examples-new/*.java
+	java -cp src Main official-tests/minijava-examples-new/*.java
