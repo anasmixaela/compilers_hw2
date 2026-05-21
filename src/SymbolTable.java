@@ -14,8 +14,8 @@ public class SymbolTable {
 
     // return type size in bytes
     public int getTypeSize(String type) {
-        if (type.equals("int")) return 8;
-        if (type.equals("boolean")) return 4;
+        if (type.equals("int")) return 4;
+        if (type.equals("boolean")) return 1;
         return 8; // arrays and object pointers
     }
 }

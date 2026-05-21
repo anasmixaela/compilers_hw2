@@ -58,7 +58,8 @@ public class Main {
                         }
                         
                         // skip main and overridden methods
-                        if (!isOverride && !methodName.equals("main")) {
+                        // Δοκιμαστική εκτύπωση όλων των μεθόδων χωρίς φιλτράρισμα override
+                        if (!methodName.equals("main")) {
                             System.out.println(fullMethodName + " : " + entry.getValue());
                         }
                     }
