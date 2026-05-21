@@ -44,7 +44,7 @@ class ClassInfo {
 class MethodInfo {
     public String name;
     public String returnType;
-    // explicit java.util.List to avoid compilation errors
+    // use explicit java.util.List to bypass any awt conflicts
     public java.util.List<String> params = new ArrayList<>(); 
     // local variables map
     public Map<String, String> locals = new LinkedHashMap<>(); 
