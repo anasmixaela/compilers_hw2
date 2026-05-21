@@ -1,6 +1,5 @@
 import syntaxtree.*;
 import visitor.GJNoArguDepthFirst;
-// import java.util.*;
 
 public class MyVisitor extends GJNoArguDepthFirst<String> {
     public SymbolTable st = new SymbolTable();

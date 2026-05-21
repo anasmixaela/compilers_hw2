@@ -21,23 +21,26 @@ public class Main {
 
                 Goal root = parser.Goal(); 
                 
+                // collect symbols and calculate offsets
                 MyVisitor collector = new MyVisitor();
                 root.accept(collector); 
 
+                // get the populated symbol table
                 SymbolTable st = collector.st;
 
+                // perform semantic type checking
                 TypeCheckVisitor typeChecker = new TypeCheckVisitor(st);
                 root.accept(typeChecker, null);
                 
                 System.out.println("----------- Offsets for " + file + " -----------");
                 
                 for (ClassInfo ci : st.classes.values()) {
-                    // 1. Εκτύπωση field offsets
+                    // print field offsets
                     for (Map.Entry<String, Integer> entry : ci.fieldOffsets.entrySet()) {
                         System.out.println(entry.getKey() + " : " + entry.getValue());
                     }
                     
-                    // 2. Εκτύπωση method offsets (Συμπεριλαμβανομένων των overrides!)
+                    // print method offsets including overrides
                     for (Map.Entry<String, Integer> entry : ci.methodOffsets.entrySet()) {
                         String fullMethodName = entry.getKey();
                         String methodName = fullMethodName.substring(fullMethodName.indexOf(".") + 1);

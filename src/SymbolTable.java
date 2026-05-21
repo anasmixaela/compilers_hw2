@@ -44,8 +44,8 @@ class ClassInfo {
 class MethodInfo {
     public String name;
     public String returnType;
-    // ordered parameter types
-    public List<String> params = new ArrayList<>(); 
+    // explicit java.util.List to avoid compilation errors
+    public java.util.List<String> params = new ArrayList<>(); 
     // local variables map
     public Map<String, String> locals = new LinkedHashMap<>(); 
 
