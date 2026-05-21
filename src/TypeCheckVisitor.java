@@ -4,13 +4,16 @@ import java.util.*;
 
 public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     private SymbolTable st;
+    private String currentClass = null;
+    private String currentMethod = null;
 
     public TypeCheckVisitor(SymbolTable st) {
         this.st = st;
     }
 
-    private String lookupVariable(String name, String currentClass, String currentMethod) {
-        if (currentMethod != null) {
+    // helper method to find a variable type
+    private String lookupVariable(String name) {
+        if (currentMethod != null && currentClass != null) {
             ClassInfo ci = st.classes.get(currentClass);
             if (ci != null && ci.methods.containsKey(currentMethod)) {
                 MethodInfo mi = ci.methods.get(currentMethod);
@@ -27,68 +30,130 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     }
 
     @Override
+    public String visit(Goal n, String argu) {
+        // visit the main class first
+        n.f0.accept(this, argu);
+        
+        // visit all other class declarations
+        if (n.f1.present()) {
+            for (int i = 0; i < n.f1.size(); i++) {
+                n.f1.nodes.get(i).accept(this, argu);
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public String visit(MainClass n, String argu) {
+        currentClass = n.f1.f0.tokenImage;
+        currentMethod = "main";
+        
+        // visit statements inside the main method
+        if (n.f14.present()) {
+            for (int i = 0; i < n.f14.size(); i++) {
+                n.f14.nodes.get(i).accept(this, argu);
+            }
+        }
+        return null;
+    }
+
+    @Override
     public String visit(ClassDeclaration n, String argu) {
-        String className = n.f1.f0.tokenImage;
-        super.visit(n, className); 
+        currentClass = n.f1.f0.tokenImage;
+        currentMethod = null;
+        
+        // visit methods of the class manually
+        if (n.f4.present()) {
+            for (int i = 0; i < n.f4.size(); i++) {
+                n.f4.nodes.get(i).accept(this, argu);
+            }
+        }
         return null;
     }
 
     @Override
     public String visit(ClassExtendsDeclaration n, String argu) {
-        String className = n.f1.f0.tokenImage;
-        super.visit(n, className);
+        currentClass = n.f1.f0.tokenImage;
+        currentMethod = null;
+        
+        // visit methods of the extended class manually
+        if (n.f6.present()) {
+            for (int i = 0; i < n.f6.size(); i++) {
+                n.f6.nodes.get(i).accept(this, argu);
+            }
+        }
         return null;
     }
 
     @Override
     public String visit(MethodDeclaration n, String argu) {
-        String methodName = n.f2.f0.tokenImage;
-        String context = argu + ":" + methodName;
+        currentMethod = n.f2.f0.tokenImage;
         
-        n.f7.accept(this, context);
-        n.f8.accept(this, context);
-        
-        String expectedRet = n.f1.accept(this, context);
-        String actualRet = n.f10.accept(this, context);
-        
-        if (expectedRet != null && actualRet != null && !expectedRet.equals(actualRet)) {
-            System.err.println("Error: Method " + methodName + " expected return type " + expectedRet + " but got " + actualRet);
-            System.exit(1);
+        // visit statements inside the method body
+        if (n.f8.present()) {
+            for (int i = 0; i < n.f8.size(); i++) {
+                n.f8.nodes.get(i).accept(this, argu);
+            }
         }
+        return null;
+    }
+
+    @Override
+    public String visit(Statement n, String argu) {
+        // unpack the underlying choice statement node
+        n.f0.accept(this, argu);
         return null;
     }
 
     @Override
     public String visit(AssignmentStatement n, String argu) {
-        String[] parts = argu.split(":");
-        String currentClass = parts[0];
-        String currentMethod = (parts.length > 1) ? parts[1] : null;
-
+        // 1. check left side variable
         String varName = n.f0.f0.tokenImage;
-        String varType = lookupVariable(varName, currentClass, currentMethod);
-        String exprType = n.f2.accept(this, argu);
-
-        if (varType != null && exprType != null && !varType.equals(exprType)) {
-            System.err.println("Error: Cannot assign " + exprType + " to variable " + varName + " of type " + varType);
+        String varType = lookupVariable(varName);
+        
+        if (varType == null) {
+            System.err.println("Error: Variable " + varName + " is not declared.");
             System.exit(1);
+        }
+
+        // 2. check right side expression
+        String exprType = n.f2.accept(this, argu);
+        
+        // if expression returns a custom name, verify it exists as a variable or class
+        if (exprType != null && !exprType.equals("int") && !exprType.equals("boolean") && !exprType.equals("int[]")) {
+            if (lookupVariable(exprType) == null && !st.classes.containsKey(exprType)) {
+                System.err.println("Error: Symbol " + exprType + " not found.");
+                System.exit(1);
+            }
         }
         return null;
     }
 
-    @Override
-    public String visit(PrintStatement n, String argu) {
-        String exprType = n.f2.accept(this, argu);
-        if (exprType != null && !exprType.equals("int")) {
-            System.err.println("Error: System.out.println requires int, got " + exprType);
-            System.exit(1);
-        }
-        return null;
+    // --- expressions type resolution ---
+
+    @Override public String visit(Expression n, String argu) { return n.f0.accept(this, argu); }
+    @Override public String visit(PrimaryExpression n, String argu) { return n.f0.accept(this, argu); }
+
+    @Override 
+    public String visit(Identifier n, String argu) {
+        String varType = lookupVariable(n.f0.tokenImage);
+        if (varType != null) return varType;
+        return n.f0.tokenImage;
     }
 
     @Override public String visit(TimesExpression n, String argu) { return "int"; }
     @Override public String visit(MinusExpression n, String argu) { return "int"; }
+    @Override public String visit(PlusExpression n, String argu) { return "int"; }
     @Override public String visit(CompareExpression n, String argu) { return "boolean"; }
+    @Override public String visit(IntegerLiteral n, String argu) { return "int"; }
+    @Override public String visit(TrueLiteral n, String argu) { return "boolean"; }
+    @Override public String visit(FalseLiteral n, String argu) { return "boolean"; }
     
+    @Override 
+    public String visit(ThisExpression n, String argu) { 
+        return currentClass != null ? currentClass : "int";
+    }
+
     @Override 
     public String visit(AllocationExpression n, String argu) { 
         return n.f1.f0.tokenImage; 
@@ -97,52 +162,20 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(MessageSend n, String argu) {
         String objType = n.f0.accept(this, argu);
-        if (objType == null || objType.equals("int") || objType.equals("boolean")) return "int";
+        if (objType == null || objType.equals("int") || objType.equals("boolean") || objType.equals("int[]")) return "int";
         
         String mName = n.f2.f0.tokenImage;
         ClassInfo ci = st.classes.get(objType);
         if (ci == null) return "int";
 
-        MethodInfo mi = null;
         String current = objType;
         while (current != null) {
             ClassInfo lookup = st.classes.get(current);
             if (lookup != null && lookup.methods.containsKey(mName)) {
-                mi = lookup.methods.get(mName);
-                break;
+                return lookup.methods.get(mName).returnType;
             }
             current = (lookup != null) ? lookup.parent : null;
         }
-
-        return (mi != null) ? mi.returnType : "int";
-    }
-
-    @Override public String visit(Expression n, String argu) { return n.f0.accept(this, argu); }
-    @Override public String visit(PrimaryExpression n, String argu) { return n.f0.accept(this, argu); }
-
-    @Override public String visit(IntegerLiteral n, String argu) { return "int"; }
-    @Override public String visit(TrueLiteral n, String argu) { return "boolean"; }
-    @Override public String visit(FalseLiteral n, String argu) { return "boolean"; }
-    
-    @Override 
-    public String visit(ThisExpression n, String argu) { 
-        if (argu != null) {
-            return argu.split(":")[0]; 
-        }
         return "int";
-    }
-
-    @Override public String visit(Type n, String argu) { return n.f0.accept(this, argu); }
-    @Override public String visit(IntegerType n, String argu) { return "int"; }
-    @Override public String visit(BooleanType n, String argu) { return "boolean"; }
-    @Override public String visit(ArrayType n, String argu) { return "int[]"; }
-    
-    @Override public String visit(Identifier n, String argu) {
-        if (argu != null && argu.contains(":")) {
-            String[] parts = argu.split(":");
-            String varType = lookupVariable(n.f0.tokenImage, parts[0], (parts.length > 1) ? parts[1] : null);
-            if (varType != null) return varType;
-        }
-        return n.f0.tokenImage;
     }
 }
