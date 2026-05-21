@@ -82,6 +82,11 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
 
     @Override
     public String visit(PrintStatement n, String argu) {
+        String exprType = n.f2.accept(this, argu);
+        if (exprType != null && !exprType.equals("int")) {
+            System.err.println("Semantic Error: System.out.println requires int, got " + exprType);
+            System.exit(1);
+        }
         return null;
     }
 
