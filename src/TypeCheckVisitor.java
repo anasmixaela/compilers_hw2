@@ -1,5 +1,6 @@
 import syntaxtree.*;
 import visitor.GJDepthFirst;
+import java.util.*;
 
 public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     private SymbolTable st;
@@ -22,7 +23,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             if (ci != null && ci.fields.containsKey(name)) return ci.fields.get(name);
             cName = (ci != null) ? ci.parent : null;
         }
-        return null; // Return null if not found to catch type errors
+        return null;
     }
 
     @Override
@@ -51,11 +52,8 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String actualRet = n.f10.accept(this, context);
         
         if (expectedRet != null && actualRet != null && !expectedRet.equals(actualRet)) {
-            // Επιτρέπουμε προσωρινά αν το actualRet είναι int λόγω fallbacks για να μην κολλάει το run-all
-            if (!actualRet.equals("int")) {
-                System.err.println("Error: Method " + methodName + " expected return type " + expectedRet + " but got " + actualRet);
-                System.exit(1);
-            }
+            System.err.println("Error: Method " + methodName + " expected return type " + expectedRet + " but got " + actualRet);
+            System.exit(1);
         }
         return null;
     }
@@ -71,11 +69,8 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String exprType = n.f2.accept(this, argu);
 
         if (varType != null && exprType != null && !varType.equals(exprType)) {
-            // Αν το expression επέστρεψε "int" λόγω κάποιου άλλου fallback, το προσπερνάμε προσωρινά
-            if (!exprType.equals("int")) {
-                System.err.println("Error: Cannot assign " + exprType + " to variable " + varName + " of type " + varType);
-                System.exit(1);
-            }
+            System.err.println("Error: Cannot assign " + exprType + " to variable " + varName + " of type " + varType);
+            System.exit(1);
         }
         return null;
     }
@@ -84,7 +79,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     public String visit(PrintStatement n, String argu) {
         String exprType = n.f2.accept(this, argu);
         if (exprType != null && !exprType.equals("int")) {
-            System.err.println("Semantic Error: System.out.println requires int, got " + exprType);
+            System.err.println("Error: System.out.println requires int, got " + exprType);
             System.exit(1);
         }
         return null;
@@ -96,7 +91,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     
     @Override 
     public String visit(AllocationExpression n, String argu) { 
-        return n.f1.f0.tokenImage; // Επιστρέφει το όνομα της κλάσης, π.χ. "Tree"
+        return n.f1.f0.tokenImage; 
     }
 
     @Override
@@ -132,7 +127,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override 
     public String visit(ThisExpression n, String argu) { 
         if (argu != null) {
-            return argu.split(":")[0]; // Επιστρέφει την τρέχουσα κλάση
+            return argu.split(":")[0]; 
         }
         return "int";
     }

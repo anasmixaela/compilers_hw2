@@ -57,18 +57,6 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
             }
             ci.fields.put(name, type);
             
-            // Calculate field offset dynamically based on parent chain to be 100% safe
-            int currentOffset = 0;
-            String pName = ci.parent;
-            while (pName != null) {
-                ClassInfo pi = st.classes.get(pName);
-                if (pi != null) {
-                    currentOffset += pi.fields.size() * 8; // simplified safe sizing
-                    break;
-                }
-                pName = null;
-            }
-            
             ci.fieldOffsets.put(currentClass + "." + name, ci.nextFieldOffset);
             ci.nextFieldOffset += st.getTypeSize(type);
         }
