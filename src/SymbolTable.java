@@ -24,8 +24,8 @@ class ClassInfo {
     public String name;
     public String parent;
     public Map<String, String> fields = new LinkedHashMap<>();
-    public Map<String, MethodInfo> methods = new LinkedHashMap<>();
-    
+    public Map<String, List<MethodInfo>> methods = new LinkedHashMap<>();
+
     // tracks variable offsets
     public Map<String, Integer> fieldOffsets = new LinkedHashMap<>();
     // tracks method offsets
@@ -45,7 +45,9 @@ class MethodInfo {
     public String name;
     public String returnType;
     // use explicit java.util.List to bypass any awt conflicts
-    public java.util.List<String> params = new ArrayList<>(); 
+    public List<String> paramTypes = new ArrayList<>();
+    public LinkedHashMap<String, String> parameters = new LinkedHashMap<>();
+
     // local variables map
     public Map<String, String> locals = new LinkedHashMap<>(); 
 

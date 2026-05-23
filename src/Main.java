@@ -21,7 +21,7 @@ public class Main {
 
                 Goal root = parser.Goal(); 
                 
-                // collect symbols and calculate offsets
+                // collect symbols using standard void visitor
                 MyVisitor collector = new MyVisitor();
                 root.accept(collector); 
 
@@ -30,7 +30,7 @@ public class Main {
 
                 // perform semantic type checking
                 TypeCheckVisitor typeChecker = new TypeCheckVisitor(st);
-                root.accept(typeChecker, null);
+                root.accept(typeChecker, ""); 
                 
                 System.out.println("----------- Offsets for " + file + " -----------");
                 
@@ -54,6 +54,7 @@ public class Main {
                 
             } catch (Exception e) {
                 System.err.println("Error in file " + file + ": " + e.getMessage());
+                e.printStackTrace();
             }
         }
     }

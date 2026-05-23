@@ -1,3 +1,6 @@
+import java.util.List;
+import java.util.ArrayList;
+
 import syntaxtree.*;
 import visitor.GJNoArguDepthFirst;
 
@@ -44,7 +47,7 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
         ClassInfo ci = st.classes.get(currentClass);
 
         if (currentMethod != null) {
-            if (currentMethod.locals.containsKey(name) || currentMethod.params.contains(name)) {
+            if (currentMethod.locals.containsKey(name)) {
                 System.err.println("Error: Duplicate local variable " + name);
                 System.exit(1);
             }
@@ -79,19 +82,29 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
         while (pName != null) {
             ClassInfo pi = st.classes.get(pName);
             if (pi != null && pi.methods.containsKey(name)) {
-                MethodInfo pm = pi.methods.get(name);
-                // Null-safe checks for overriding
-                if (pm.returnType != null && retType != null && pm.returnType.equals(retType) && pm.params.equals(currentMethod.params)) {
-                    isOverride = true;
-                    Integer pOffset = pi.methodOffsets.get(pName + "." + name);
-                    overrideOffset = (pOffset != null) ? pOffset : 0;
-                    break;
+                List<MethodInfo> parentMethods = pi.methods.get(name);
+
+                if (parentMethods != null) {
+                    for (MethodInfo pm : parentMethods) {
+
+                        if (pm.returnType.equals(retType)
+                            && pm.paramTypes.equals(currentMethod.paramTypes)) {
+
+                            isOverride = true;
+
+                            Integer pOffset = pi.methodOffsets.get(pName + "." + name);
+                            overrideOffset = (pOffset != null) ? pOffset : 0;
+
+                            break;
+                        }
+                    }
                 }
             }
             pName = (pi != null) ? pi.parent : null;
         }
 
-        ci.methods.put(name, currentMethod);
+        ci.methods.putIfAbsent(name, new ArrayList<>());
+        ci.methods.get(name).add(currentMethod);
 
         if (isOverride) {
             ci.methodOffsets.put(currentClass + "." + name, overrideOffset);
@@ -113,8 +126,14 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
         String name = n.f1.f0.tokenImage;
         
         if (currentMethod != null) {
-            currentMethod.params.add(type);
-            currentMethod.locals.put(name, type); 
+            if (currentMethod.parameters.containsKey(name)) {
+                System.err.println("Error: Duplicate parameter " + name);
+                System.exit(1);
+            }
+
+            currentMethod.parameters.put(name, type);
+            currentMethod.paramTypes.add(type);
+            currentMethod.locals.put(name, type);
         }
         return null;
     }

@@ -3,7 +3,7 @@ import visitor.GJDepthFirst;
 import java.util.*;
 
 public class TypeCheckVisitor extends GJDepthFirst<String, String> {
-    private SymbolTable st;
+    private final SymbolTable st;
     private String currentClass = null;
     private String currentMethod = null;
 
@@ -11,13 +11,22 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         this.st = st;
     }
 
-    // helper method to find a variable type
     private String lookupVariable(String name) {
         if (currentMethod != null && currentClass != null) {
             ClassInfo ci = st.classes.get(currentClass);
+
             if (ci != null && ci.methods.containsKey(currentMethod)) {
-                MethodInfo mi = ci.methods.get(currentMethod);
-                if (mi.locals.containsKey(name)) return mi.locals.get(name);
+
+                List<MethodInfo> methodList = ci.methods.get(currentMethod);
+
+                if (methodList != null && !methodList.isEmpty()) {
+
+                    MethodInfo mi = methodList.get(0);
+
+                    if (mi.locals.containsKey(name)) {
+                        return mi.locals.get(name);
+                    }
+                }
             }
         }
         String cName = currentClass;
@@ -31,15 +40,8 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
 
     @Override
     public String visit(Goal n, String argu) {
-        // visit the main class first
         n.f0.accept(this, argu);
-        
-        // visit all other class declarations
-        if (n.f1.present()) {
-            for (int i = 0; i < n.f1.size(); i++) {
-                n.f1.nodes.get(i).accept(this, argu);
-            }
-        }
+        n.f1.accept(this, argu);
         return null;
     }
 
@@ -47,8 +49,6 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     public String visit(MainClass n, String argu) {
         currentClass = n.f1.f0.tokenImage;
         currentMethod = "main";
-        
-        // visit statements inside the main method
         if (n.f14.present()) {
             for (int i = 0; i < n.f14.size(); i++) {
                 n.f14.nodes.get(i).accept(this, argu);
@@ -61,8 +61,6 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     public String visit(ClassDeclaration n, String argu) {
         currentClass = n.f1.f0.tokenImage;
         currentMethod = null;
-        
-        // visit methods of the class manually
         if (n.f4.present()) {
             for (int i = 0; i < n.f4.size(); i++) {
                 n.f4.nodes.get(i).accept(this, argu);
@@ -75,8 +73,6 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     public String visit(ClassExtendsDeclaration n, String argu) {
         currentClass = n.f1.f0.tokenImage;
         currentMethod = null;
-        
-        // visit methods of the extended class manually
         if (n.f6.present()) {
             for (int i = 0; i < n.f6.size(); i++) {
                 n.f6.nodes.get(i).accept(this, argu);
@@ -88,8 +84,6 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(MethodDeclaration n, String argu) {
         currentMethod = n.f2.f0.tokenImage;
-        
-        // visit statements inside the method body
         if (n.f8.present()) {
             for (int i = 0; i < n.f8.size(); i++) {
                 n.f8.nodes.get(i).accept(this, argu);
@@ -100,14 +94,12 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
 
     @Override
     public String visit(Statement n, String argu) {
-        // unpack the underlying choice statement node
         n.f0.accept(this, argu);
         return null;
     }
 
     @Override
     public String visit(AssignmentStatement n, String argu) {
-        // 1. check left side variable
         String varName = n.f0.f0.tokenImage;
         String varType = lookupVariable(varName);
         
@@ -116,10 +108,8 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             System.exit(1);
         }
 
-        // 2. check right side expression
         String exprType = n.f2.accept(this, argu);
         
-        // if expression returns a custom name, verify it exists as a variable or class
         if (exprType != null && !exprType.equals("int") && !exprType.equals("boolean") && !exprType.equals("int[]")) {
             if (lookupVariable(exprType) == null && !st.classes.containsKey(exprType)) {
                 System.err.println("Error: Symbol " + exprType + " not found.");
@@ -128,8 +118,6 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         }
         return null;
     }
-
-    // --- expressions type resolution ---
 
     @Override public String visit(Expression n, String argu) { return n.f0.accept(this, argu); }
     @Override public String visit(PrimaryExpression n, String argu) { return n.f0.accept(this, argu); }
@@ -172,7 +160,11 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         while (current != null) {
             ClassInfo lookup = st.classes.get(current);
             if (lookup != null && lookup.methods.containsKey(mName)) {
-                return lookup.methods.get(mName).returnType;
+                List<MethodInfo> methods = lookup.methods.get(mName);
+
+                if (methods != null && !methods.isEmpty()) {
+                    return methods.get(0).returnType;
+                }
             }
             current = (lookup != null) ? lookup.parent : null;
         }
