@@ -1,145 +1,307 @@
-import java.util.ArrayList;
-
 import syntaxtree.*;
 import visitor.GJDepthFirst;
 
 public class MyVisitor extends GJDepthFirst<String, String> {
+
+    // shared symbol table
     public SymbolTable st = new SymbolTable();
+
+    // current class during traversal
     private String currentClass = null;
+
+    // current method during traversal
     private MethodInfo currentMethod = null;
 
     @Override
     public String visit(ClassDeclaration n, String argu) {
+
         String className = n.f1.f0.tokenImage;
+
+        // add class without parent
         st.addClass(className, null);
+
         currentClass = className;
         currentMethod = null;
+
         super.visit(n, argu);
+
         return null;
     }
 
     @Override
-    public String visit(ClassExtendsDeclaration n,  String argu) {
+    public String visit(
+        ClassExtendsDeclaration n,
+        String argu
+    ) {
+
         String className = n.f1.f0.tokenImage;
         String parentName = n.f3.f0.tokenImage;
+
+        // add subclass
         st.addClass(className, parentName);
+
         currentClass = className;
         currentMethod = null;
-        
-        // inherit starting offsets from parent if parent is already parsed
+
         ClassInfo child = st.classes.get(className);
         ClassInfo parent = st.classes.get(parentName);
+
+        // inherit offsets from parent
         if (parent != null) {
-            child.nextFieldOffset = parent.nextFieldOffset;
-            child.nextMethodOffset = parent.nextMethodOffset;
+
+            child.nextFieldOffset =
+                parent.nextFieldOffset;
+
+            child.nextMethodOffset =
+                parent.nextMethodOffset;
         }
-        
+
         super.visit(n, argu);
+
         return null;
     }
 
     @Override
     public String visit(VarDeclaration n, String argu) {
+
         String type = n.f0.accept(this, argu);
         String name = n.f1.f0.tokenImage;
 
         ClassInfo ci = st.classes.get(currentClass);
 
+        // local variable
         if (currentMethod != null) {
+
             if (currentMethod.locals.containsKey(name)) {
-                System.err.println("Error: Duplicate local variable " + name);
-                System.exit(1);
+
+                throw new RuntimeException("Error: duplicate local variable " + name);
             }
+
             currentMethod.locals.put(name, type);
-        } else {
-            if (ci.fields.containsKey(name)) {
-                System.err.println("Error: Duplicate field " + name);
-                System.exit(1);
-            }
-            ci.fields.put(name, type);
-            
-            ci.fieldOffsets.put(currentClass + "." + name, ci.nextFieldOffset);
-            ci.nextFieldOffset += st.getTypeSize(type);
         }
+
+        // class field
+        else {
+
+            if (ci.fields.containsKey(name)) {
+
+                System.err.println(
+                    "Error: duplicate field " + name
+                );
+
+                throw new RuntimeException("Error: duplicate field " + name);
+            }
+
+            ci.fields.put(name, type);
+
+            // store field offset
+            ci.fieldOffsets.put(
+                currentClass + "." + name,
+                ci.nextFieldOffset
+            );
+
+            // advance offset
+            ci.nextFieldOffset +=
+                st.getTypeSize(type);
+        }
+
         return null;
     }
 
     @Override
-    public String visit(MethodDeclaration n, String argu) {
-        String retType = n.f1.accept(this, argu);
-        String name = n.f2.f0.tokenImage;
+    public String visit(
+        MethodDeclaration n,
+        String argu
+    ) {
 
-        ClassInfo ci = st.classes.get(currentClass);
-        currentMethod = new MethodInfo(name, retType);
-        
+        String returnType =
+            n.f1.accept(this, argu);
+
+        String methodName =
+            n.f2.f0.tokenImage;
+
+        ClassInfo ci =
+            st.classes.get(currentClass);
+
+        // create temporary method object
+        currentMethod =
+            new MethodInfo(
+                methodName,
+                returnType
+            );
+
+        // collect parameters
         n.f4.accept(this, argu);
 
-        boolean isOverride = false;
-        String pName = ci.parent;
-        int overrideOffset = -1;
+        String signature =
+            currentMethod.getSignature();
 
-        while (pName != null) {
-            ClassInfo pi = st.classes.get(pName);
-            if (pi != null && pi.methods.containsKey(name)) {
-                java.util.List<MethodInfo> parentMethods = pi.methods.get(name);
+        // check duplicate methods
+        if (ci.methods.containsKey(signature)) {
 
-                if (parentMethods != null) {
-                    for (MethodInfo pm : parentMethods) {
-
-                        if (pm.returnType.equals(retType)
-                            && pm.paramTypes.equals(currentMethod.paramTypes)) {
-
-                            isOverride = true;
-
-                            Integer pOffset = pi.methodOffsets.get(pName + "." + name);
-                            overrideOffset = (pOffset != null) ? pOffset : 0;
-
-                            break;
-                        }
-                    }
-                }
-            }
-            pName = (pi != null) ? pi.parent : null;
+            throw new RuntimeException("Error: duplicate method " + signature);
         }
 
-        ci.methods.putIfAbsent(name, new ArrayList<>());
-        ci.methods.get(name).add(currentMethod);
+        boolean isOverride = false;
+        int inheritedOffset = -1;
 
+        // walk inheritance chain
+        String parentName = ci.parent;
+
+        while (parentName != null) {
+
+            ClassInfo parent =
+                st.classes.get(parentName);
+
+            if (parent == null) {
+                break;
+            }
+
+            // compare against parent methods
+            for (MethodInfo parentMethod :
+                parent.methods.values()) {
+
+                // different names are irrelevant
+                if (!parentMethod.name.equals(methodName)) {
+                    continue;
+                }
+
+                // exact same parameter types
+                boolean sameParams =
+                    parentMethod.paramTypes.equals(
+                        currentMethod.paramTypes
+                    );
+
+                // overriding case
+                if (sameParams) {
+
+                    isOverride = true;
+
+                    // return type must match
+                    if (!parentMethod.returnType.equals(returnType)) {
+
+                        throw new RuntimeException("Error: invalid override of method " + methodName);
+                    }
+
+                    Integer offset =
+                        parent.methodOffsets.get(
+                            parentMethod.getSignature()
+                        );
+
+                    if (offset != null) {
+                        inheritedOffset = offset;
+                    }
+                }
+
+                // illegal overload case
+                else if (
+                    st.methodsConflict(
+                        currentMethod,
+                        parentMethod
+                    )
+                ) {
+
+                    throw new RuntimeException("Error: illegal overload for method " + methodName);
+                }
+            }
+
+            parentName = parent.parent;
+        }
+
+        // store override offset
         if (isOverride) {
-            ci.methodOffsets.put(currentClass + "." + name, overrideOffset);
-        } else {
-            ci.methodOffsets.put(currentClass + "." + name, ci.nextMethodOffset);
+
+            ci.methodOffsets.put(
+                signature,
+                inheritedOffset
+            );
+        }
+
+        // assign new offset
+        else {
+
+            ci.methodOffsets.put(
+                signature,
+                ci.nextMethodOffset
+            );
+
             ci.nextMethodOffset += 8;
         }
 
-        n.f7.accept(this, argu);
-        n.f8.accept(this, argu);
+        // insert method into class
+        ci.methods.put(signature, currentMethod);
 
+        // visit locals
+        n.f7.accept(this, argu);
+
+        // method finished
         currentMethod = null;
+
         return null;
     }
 
     @Override
-    public String visit(FormalParameter n, String argu) {
-        String type = n.f0.accept(this, argu);
-        String name = n.f1.f0.tokenImage;
-        
-        if (currentMethod != null) {
-            if (currentMethod.parameters.containsKey(name)) {
-                System.err.println("Error: Duplicate parameter " + name);
-                System.exit(1);
-            }
+    public String visit(
+        FormalParameter n,
+        String argu
+    ) {
 
-            currentMethod.parameters.put(name, type);
-            currentMethod.paramTypes.add(type);
-            currentMethod.locals.put(name, type);
+        String type =
+            n.f0.accept(this, argu);
+
+        String name =
+            n.f1.f0.tokenImage;
+
+        // duplicate parameter
+        if (currentMethod.parameters.containsKey(name)) {
+
+            throw new RuntimeException("Error: duplicate parameter " + name);
         }
+
+        // store parameter
+        currentMethod.parameters.put(
+            name,
+            type
+        );
+
+        currentMethod.paramTypes.add(type);
+
+        // parameters are visible as locals
+        currentMethod.locals.put(
+            name,
+            type
+        );
+
         return null;
     }
 
-    @Override public String visit(Type n, String argu) { return n.f0.accept(this, argu); } 
-    @Override public String visit(IntegerType n, String argu) { return "int"; }
-    @Override public String visit(BooleanType n, String argu) { return "boolean"; }
-    @Override public String visit(ArrayType n, String argu) { return "int[]"; }
-    @Override public String visit(Identifier n, String argu) { return n.f0.tokenImage; }
+    @Override
+    public String visit(Type n, String argu) {
+
+        return n.f0.accept(this, argu);
+    }
+
+    @Override
+    public String visit(IntegerType n, String argu) {
+
+        return "int";
+    }
+
+    @Override
+    public String visit(BooleanType n, String argu) {
+
+        return "boolean";
+    }
+
+    @Override
+    public String visit(ArrayType n, String argu) {
+
+        return "int[]";
+    }
+
+    @Override
+    public String visit(Identifier n, String argu) {
+
+        return n.f0.tokenImage;
+    }
 }

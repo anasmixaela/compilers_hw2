@@ -1,6 +1,5 @@
 import syntaxtree.*;
 import visitor.GJDepthFirst;
-import java.util.List;
 
 public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     private final SymbolTable st;
@@ -12,29 +11,44 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     }
 
     private String lookupVariable(String name) {
-        if (currentMethod != null && currentClass != null) {
+
+        // check locals first
+        if (currentMethod != null) {
+
             ClassInfo ci = st.classes.get(currentClass);
 
-            if (ci != null && ci.methods.containsKey(currentMethod)) {
+            if (ci != null) {
 
-                java.util.List<MethodInfo> methodList = ci.methods.get(currentMethod);
+                for (MethodInfo m : ci.methods.values()) {
 
-                if (methodList != null && !methodList.isEmpty()) {
+                    if (m.name.equals(currentMethod)) {
 
-                    MethodInfo mi = methodList.get(0);
+                        if (m.locals.containsKey(name)) {
+                            return m.locals.get(name);
+                        }
 
-                    if (mi.locals.containsKey(name)) {
-                        return mi.locals.get(name);
+                        break;
                     }
                 }
             }
         }
+
+        // check fields (inheritance chain)
         String cName = currentClass;
+
         while (cName != null) {
+
             ClassInfo ci = st.classes.get(cName);
-            if (ci != null && ci.fields.containsKey(name)) return ci.fields.get(name);
+
+            if (ci != null &&
+                ci.fields.containsKey(name)) {
+
+                return ci.fields.get(name);
+            }
+
             cName = (ci != null) ? ci.parent : null;
         }
+
         return null;
     }
 
@@ -104,8 +118,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String varType = lookupVariable(varName);
         
         if (varType == null) {
-            System.err.println("Error: Variable " + varName + " is not declared.");
-            System.exit(1);
+            throw new RuntimeException("Error: Variable " + varName + " is not declared.");
         }
 
         String exprType = n.f2.accept(this, argu);
@@ -115,18 +128,12 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         }
         if (!st.isSubtype(exprType, varType)) {
 
-            System.err.println(
-                "Error: Cannot assign " + exprType +
-                " to variable of type " + varType
-            );
-
-            System.exit(1);
+            throw new RuntimeException("Error: Cannot assign " + exprType + " to variable of type " + varType);
         }
         
         if (!exprType.equals("int") && !exprType.equals("boolean") && !exprType.equals("int[]")) {
             if (lookupVariable(exprType) == null && !st.classes.containsKey(exprType)) {
-                System.err.println("Error: Symbol " + exprType + " not found.");
-                System.exit(1);
+                throw new RuntimeException("Error: Symbol " + exprType + " not found.");
             }
         }
         return null;
@@ -162,26 +169,37 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
 
     @Override
     public String visit(MessageSend n, String argu) {
+
         String objType = n.f0.accept(this, argu);
-        if (objType == null || objType.equals("int") || objType.equals("boolean") || objType.equals("int[]")) return "int";
-        
+
+        if (objType == null ||
+            objType.equals("int") ||
+            objType.equals("boolean") ||
+            objType.equals("int[]")) {
+            return "int";
+        }
+
         String mName = n.f2.f0.tokenImage;
-        ClassInfo ci = st.classes.get(objType);
-        if (ci == null) return "int";
 
         String current = objType;
-        while (current != null) {
-            ClassInfo lookup = st.classes.get(current);
-            if (lookup != null && lookup.methods.containsKey(mName)) {
-                List<MethodInfo> methods = lookup.methods.get(mName);
 
-                if (methods != null && !methods.isEmpty ()) {
-                    MethodInfo mi = (MethodInfo) methods.get(0);
-                    return mi.returnType;
+        while (current != null) {
+
+            ClassInfo lookup = st.classes.get(current);
+
+            if (lookup != null) {
+
+                for (MethodInfo m : lookup.methods.values()) {
+
+                    if (m.name.equals(mName)) {
+                        return m.returnType;
+                    }
                 }
             }
+
             current = (lookup != null) ? lookup.parent : null;
         }
+
         return "int";
     }
 }

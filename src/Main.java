@@ -23,7 +23,7 @@ public class Main {
                 
                 // collect symbols using standard void visitor
                 MyVisitor collector = new MyVisitor();
-                root.accept(collector, ""); 
+                root.accept(collector, "");
 
                 // get the populated symbol table
                 SymbolTable st = collector.st;
@@ -43,10 +43,37 @@ public class Main {
                     
                     // print method offsets including overrides
                     for (Map.Entry<String, Integer> entry : ci.methodOffsets.entrySet()) {
+
                         String fullMethodName = entry.getKey();
-                        String methodName = fullMethodName.substring(fullMethodName.indexOf(".") + 1);
-                        
-                        if (!methodName.equals("main")) {
+
+                        // skip main method
+                        if (fullMethodName.contains(".main")) {
+                            continue;
+                        }
+
+                        // skip overridden methods
+                        boolean alreadyPrinted = false;
+
+                        if (ci.parent != null) {
+
+                            ClassInfo parentClass = st.classes.get(ci.parent);
+
+                            while (parentClass != null) {
+
+                                if (parentClass.methodOffsets.containsValue(entry.getValue())) {
+                                    alreadyPrinted = true;
+                                    break;
+                                }
+
+                                if (parentClass.parent == null) {
+                                    break;
+                                }
+
+                                parentClass = st.classes.get(parentClass.parent);
+                            }
+                        }
+
+                        if (!alreadyPrinted) {
                             System.out.println(fullMethodName + " : " + entry.getValue());
                         }
                     }
@@ -54,8 +81,9 @@ public class Main {
                 System.out.println();
                 
             } catch (Exception e) {
-                System.err.println("Error in file " + file + ": " + e.getMessage());
-                e.printStackTrace();
+                System.err.println(
+                    "Error in file " + file + ": " + e.getMessage()
+                );
             }
         }
     }

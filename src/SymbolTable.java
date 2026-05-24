@@ -3,119 +3,222 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class SymbolTable {
-    // map for storing class definitions
+
+    // stores all program classes
     public Map<String, ClassInfo> classes = new LinkedHashMap<>();
 
+    // add new class to symbol table
     public void addClass(String name, String parent) {
+
         if (classes.containsKey(name)) {
-            System.err.println("Error: Class " + name + " already defined.");
-            System.exit(1);
+
+            throw new RuntimeException("Error: duplicate class " + name);
         }
+
         classes.put(name, new ClassInfo(name, parent));
     }
 
-    // return type size in bytes
+    // returns field size in bytes
     public int getTypeSize(String type) {
-        if (type.equals("int")) return 4;
-        if (type.equals("boolean")) return 1;
-        return 8; // arrays and object pointers
+
+        if (type.equals("int")) {
+            return 4;
+        }
+
+        if (type.equals("boolean")) {
+            return 1;
+        }
+
+        // arrays and objects are pointers
+        return 8;
     }
 
+    // checks inheritance relationship
     public boolean isSubtype(String child, String parent) {
+
         if (child == null || parent == null) {
             return false;
         }
+
+        // same type
         if (child.equals(parent)) {
             return true;
         }
 
-        ClassInfo ci = classes.get(child);
+        // walk inheritance chain
+        ClassInfo current = classes.get(child);
 
-        while (ci != null) {
-            if (ci.parent != null && ci.parent.equals(parent)) {
+        while (current != null) {
+
+            if (current.parent != null &&
+                current.parent.equals(parent)) {
+
                 return true;
             }
-            ci = classes.get(ci.parent);
+
+            current = classes.get(current.parent);
         }
 
         return false;
     }
 
+    // checks if two methods create illegal overload
+    public boolean methodsConflict(
+        MethodInfo a,
+        MethodInfo b
+    ) {
+
+        // different names are always ok
+        if (!a.name.equals(b.name)) {
+            return false;
+        }
+
+        // different argument count is always ok
+        if (a.paramTypes.size() != b.paramTypes.size()) {
+            return false;
+        }
+
+        // check if all positions are comparable
+        for (int i = 0; i < a.paramTypes.size(); i++) {
+
+            String typeA = a.paramTypes.get(i);
+            String typeB = b.paramTypes.get(i);
+
+            boolean comparable =
+                isSubtype(typeA, typeB) ||
+                isSubtype(typeB, typeA);
+
+            // one unrelated position means legal overload
+            if (!comparable) {
+                return false;
+            }
+        }
+
+        // all positions comparable -> illegal overlap
+        return true;
+    }
+
+    // validates inheritance graph
     public void validateInheritance() {
+
         for (ClassInfo ci : classes.values()) {
-            if (ci.parent != null && !classes.containsKey(ci.parent)) {
-                System.err.println(
-                    "Error: Class " + ci.name +
-                    " extends undefined class " + ci.parent
-                );
-                System.exit(1);
+
+            // parent must exist
+            if (ci.parent != null &&
+                !classes.containsKey(ci.parent)) {
+
+                throw new RuntimeException("Error: unknown parent class " + ci.parent);
             }
 
-            String slow = ci.name;
-            String fast = ci.parent;
+            // detect inheritance cycles
+            String current = ci.parent;
 
-            while (fast != null) {
-                ClassInfo fastInfo = classes.get(fast);
-                if (fastInfo == null) {
+            while (current != null) {
+
+                if (current.equals(ci.name)) {
+
+                    throw new RuntimeException("Error: cyclic inheritance");
+                }
+
+                ClassInfo parentInfo = classes.get(current);
+
+                if (parentInfo == null) {
                     break;
                 }
-                fast = fastInfo.parent;
-                if (fast != null) {
-                    ClassInfo secondHop = classes.get(fast);
-                    if (secondHop != null) {
-                        fast = secondHop.parent;
-                    }
-                }
 
-                ClassInfo slowInfo = classes.get(slow);
-
-                if (slowInfo != null) {
-                    slow = slowInfo.parent;
-                }
-                if (slow != null && slow.equals(fast)) {
-                    System.err.println(
-                        "Error: Cyclic inheritance involving class " + ci.name
-                    );
-                    System.exit(1);
-                }
+                current = parentInfo.parent;
             }
         }
     }
 }
 
-class ClassInfo { 
-    public String name;
-    public String parent;
-    public Map<String, String> fields = new LinkedHashMap<>();
-    public Map<String, java.util.List<MethodInfo>> methods = new LinkedHashMap<>();
+// stores information for one class
+class ClassInfo {
 
-    // tracks variable offsets
-    public Map<String, Integer> fieldOffsets = new LinkedHashMap<>();
-    // tracks method offsets
-    public Map<String, Integer> methodOffsets = new LinkedHashMap<>();
-    
-    // next available positions
+    // class name
+    public String name;
+
+    // parent class name
+    public String parent;
+
+    // field name -> type
+    public LinkedHashMap<String, String> fields =
+        new LinkedHashMap<>();
+
+    // method signature -> method info
+    public LinkedHashMap<String, MethodInfo> methods =
+        new LinkedHashMap<>();
+
+    // field offsets
+    public LinkedHashMap<String, Integer> fieldOffsets =
+        new LinkedHashMap<>();
+
+    // method offsets
+    public LinkedHashMap<String, Integer> methodOffsets =
+        new LinkedHashMap<>();
+
+    // next available field offset
     public int nextFieldOffset = 0;
+
+    // next available method offset
     public int nextMethodOffset = 0;
-    
+
     public ClassInfo(String name, String parent) {
+
         this.name = name;
         this.parent = parent;
     }
 }
 
+// stores information for one method
 class MethodInfo {
+
+    // method name
     public String name;
+
+    // method return type
     public String returnType;
-    // use explicit java.util.List to bypass any awt conflicts
-    public java.util.List<String> paramTypes = new ArrayList<>();
-    public LinkedHashMap<String, String> parameters = new LinkedHashMap<>();
 
-    // local variables map
-    public Map<String, String> locals = new LinkedHashMap<>(); 
+    // ordered parameter types
+    public ArrayList<String> paramTypes =
+        new ArrayList<>();
 
-    public MethodInfo(String name, String returnType) {
+    // parameter name -> type
+    public LinkedHashMap<String, String> parameters =
+        new LinkedHashMap<>();
+
+    // local variable name -> type
+    public LinkedHashMap<String, String> locals =
+        new LinkedHashMap<>();
+
+    public MethodInfo(
+        String name,
+        String returnType
+    ) {
+
         this.name = name;
         this.returnType = returnType;
+    }
+
+    // creates unique method signature
+    public String getSignature() {
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.append(name);
+        sb.append("(");
+
+        for (int i = 0; i < paramTypes.size(); i++) {
+
+            sb.append(paramTypes.get(i));
+
+            if (i != paramTypes.size() - 1) {
+                sb.append(",");
+            }
+        }
+
+        sb.append(")");
+
+        return sb.toString();
     }
 }
