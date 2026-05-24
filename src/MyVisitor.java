@@ -82,7 +82,7 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
         while (pName != null) {
             ClassInfo pi = st.classes.get(pName);
             if (pi != null && pi.methods.containsKey(name)) {
-                List<MethodInfo> parentMethods = pi.methods.get(name);
+                java.util.List<MethodInfo> parentMethods = pi.methods.get(name);
 
                 if (parentMethods != null) {
                     for (MethodInfo pm : parentMethods) {

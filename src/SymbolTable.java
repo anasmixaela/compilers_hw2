@@ -1,7 +1,7 @@
-import java.util.Map;
-import java.util.List;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public class SymbolTable {
     // map for storing class definitions
@@ -88,7 +88,7 @@ class ClassInfo {
     public String name;
     public String parent;
     public Map<String, String> fields = new LinkedHashMap<>();
-    public Map<String, List<MethodInfo>> methods = new LinkedHashMap<>();
+    public Map<String, java.util.List<MethodInfo>> methods = new LinkedHashMap<>();
 
     // tracks variable offsets
     public Map<String, Integer> fieldOffsets = new LinkedHashMap<>();
@@ -109,7 +109,7 @@ class MethodInfo {
     public String name;
     public String returnType;
     // use explicit java.util.List to bypass any awt conflicts
-    public List<String> paramTypes = new ArrayList<>();
+    public java.util.List<String> paramTypes = new ArrayList<>();
     public LinkedHashMap<String, String> parameters = new LinkedHashMap<>();
 
     // local variables map

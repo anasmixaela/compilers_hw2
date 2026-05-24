@@ -1,6 +1,6 @@
 import syntaxtree.*;
 import visitor.GJDepthFirst;
-import java.util.*;
+import java.util.List;
 
 public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     private final SymbolTable st;
@@ -17,7 +17,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
 
             if (ci != null && ci.methods.containsKey(currentMethod)) {
 
-                List<MethodInfo> methodList = ci.methods.get(currentMethod);
+                java.util.List<MethodInfo> methodList = ci.methods.get(currentMethod);
 
                 if (methodList != null && !methodList.isEmpty()) {
 
@@ -109,6 +109,10 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         }
 
         String exprType = n.f2.accept(this, argu);
+
+        if (exprType == null) {
+            return null;
+        }
         if (!st.isSubtype(exprType, varType)) {
 
             System.err.println(
@@ -119,7 +123,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             System.exit(1);
         }
         
-        if (exprType != null && !exprType.equals("int") && !exprType.equals("boolean") && !exprType.equals("int[]")) {
+        if (!exprType.equals("int") && !exprType.equals("boolean") && !exprType.equals("int[]")) {
             if (lookupVariable(exprType) == null && !st.classes.containsKey(exprType)) {
                 System.err.println("Error: Symbol " + exprType + " not found.");
                 System.exit(1);
@@ -169,7 +173,12 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         while (current != null) {
             ClassInfo lookup = st.classes.get(current);
             if (lookup != null && lookup.methods.containsKey(mName)) {
-                List<MethodInfo> methods = lookup.methods.get(mName);
+                List methods = lookup.methods.get(mName);
+
+                if (methods != null && !methods.isEmpty ()) {
+                    MethodInfo mi = (MethodInfo) methods.get(0);
+                    return mi.returnType;
+                }
 
                 if (methods != null && !methods.isEmpty()) {
                     return methods.get(0).returnType;
