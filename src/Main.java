@@ -27,6 +27,7 @@ public class Main {
 
                 // get the populated symbol table
                 SymbolTable st = collector.st;
+                st.validateInheritance();
 
                 // perform semantic type checking
                 TypeCheckVisitor typeChecker = new TypeCheckVisitor(st);

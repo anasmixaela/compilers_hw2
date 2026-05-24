@@ -109,6 +109,15 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         }
 
         String exprType = n.f2.accept(this, argu);
+        if (!st.isSubtype(exprType, varType)) {
+
+            System.err.println(
+                "Error: Cannot assign " + exprType +
+                " to variable of type " + varType
+            );
+
+            System.exit(1);
+        }
         
         if (exprType != null && !exprType.equals("int") && !exprType.equals("boolean") && !exprType.equals("int[]")) {
             if (lookupVariable(exprType) == null && !st.classes.containsKey(exprType)) {
