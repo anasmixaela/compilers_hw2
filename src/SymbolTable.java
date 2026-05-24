@@ -5,7 +5,7 @@ import java.util.Map;
 public class SymbolTable {
 
     // stores all program classes
-    public Map<String, ClassInfo> classes = new LinkedHashMap<>();
+    Map<String, ClassInfo> classes = new LinkedHashMap<>();
 
     // add new class to symbol table
     public void addClass(String name, String parent) {
@@ -63,7 +63,7 @@ public class SymbolTable {
     }
 
     // checks if two methods create illegal overload
-    public boolean methodsConflict(
+    boolean methodsConflict(
         MethodInfo a,
         MethodInfo b
     ) {
