@@ -23,7 +23,7 @@ public class Main {
                 
                 // collect symbols using standard void visitor
                 MyVisitor collector = new MyVisitor();
-                root.accept(collector); 
+                root.accept(collector, ""); 
 
                 // get the populated symbol table
                 SymbolTable st = collector.st;

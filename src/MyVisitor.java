@@ -1,26 +1,25 @@
-import java.util.List;
 import java.util.ArrayList;
 
 import syntaxtree.*;
-import visitor.GJNoArguDepthFirst;
+import visitor.GJDepthFirst;
 
-public class MyVisitor extends GJNoArguDepthFirst<String> {
+public class MyVisitor extends GJDepthFirst<String, String> {
     public SymbolTable st = new SymbolTable();
     private String currentClass = null;
     private MethodInfo currentMethod = null;
 
     @Override
-    public String visit(ClassDeclaration n) {
+    public String visit(ClassDeclaration n, String argu) {
         String className = n.f1.f0.tokenImage;
         st.addClass(className, null);
         currentClass = className;
         currentMethod = null;
-        super.visit(n);
+        super.visit(n, argu);
         return null;
     }
 
     @Override
-    public String visit(ClassExtendsDeclaration n) {
+    public String visit(ClassExtendsDeclaration n,  String argu) {
         String className = n.f1.f0.tokenImage;
         String parentName = n.f3.f0.tokenImage;
         st.addClass(className, parentName);
@@ -35,13 +34,13 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
             child.nextMethodOffset = parent.nextMethodOffset;
         }
         
-        super.visit(n);
+        super.visit(n, argu);
         return null;
     }
 
     @Override
-    public String visit(VarDeclaration n) {
-        String type = n.f0.accept(this);
+    public String visit(VarDeclaration n, String argu) {
+        String type = n.f0.accept(this, argu);
         String name = n.f1.f0.tokenImage;
 
         ClassInfo ci = st.classes.get(currentClass);
@@ -66,14 +65,14 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
     }
 
     @Override
-    public String visit(MethodDeclaration n) {
-        String retType = n.f1.accept(this);
+    public String visit(MethodDeclaration n, String argu) {
+        String retType = n.f1.accept(this, argu);
         String name = n.f2.f0.tokenImage;
 
         ClassInfo ci = st.classes.get(currentClass);
         currentMethod = new MethodInfo(name, retType);
         
-        n.f4.accept(this);
+        n.f4.accept(this, argu);
 
         boolean isOverride = false;
         String pName = ci.parent;
@@ -113,16 +112,16 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
             ci.nextMethodOffset += 8;
         }
 
-        n.f7.accept(this);
-        n.f8.accept(this);
+        n.f7.accept(this, argu);
+        n.f8.accept(this, argu);
 
         currentMethod = null;
         return null;
     }
 
     @Override
-    public String visit(FormalParameter n) {
-        String type = n.f0.accept(this);
+    public String visit(FormalParameter n, String argu) {
+        String type = n.f0.accept(this, argu);
         String name = n.f1.f0.tokenImage;
         
         if (currentMethod != null) {
@@ -138,9 +137,9 @@ public class MyVisitor extends GJNoArguDepthFirst<String> {
         return null;
     }
 
-    @Override public String visit(Type n) { return n.f0.accept(this); } // CRITICAL FIX
-    @Override public String visit(IntegerType n) { return "int"; }
-    @Override public String visit(BooleanType n) { return "boolean"; }
-    @Override public String visit(ArrayType n) { return "int[]"; }
-    @Override public String visit(Identifier n) { return n.f0.tokenImage; }
+    @Override public String visit(Type n, String argu) { return n.f0.accept(this, argu); } 
+    @Override public String visit(IntegerType n, String argu) { return "int"; }
+    @Override public String visit(BooleanType n, String argu) { return "boolean"; }
+    @Override public String visit(ArrayType n, String argu) { return "int[]"; }
+    @Override public String visit(Identifier n, String argu) { return n.f0.tokenImage; }
 }

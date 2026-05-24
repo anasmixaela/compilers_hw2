@@ -173,15 +173,11 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         while (current != null) {
             ClassInfo lookup = st.classes.get(current);
             if (lookup != null && lookup.methods.containsKey(mName)) {
-                List methods = lookup.methods.get(mName);
+                List<MethodInfo> methods = lookup.methods.get(mName);
 
                 if (methods != null && !methods.isEmpty ()) {
                     MethodInfo mi = (MethodInfo) methods.get(0);
                     return mi.returnType;
-                }
-
-                if (methods != null && !methods.isEmpty()) {
-                    return methods.get(0).returnType;
                 }
             }
             current = (lookup != null) ? lookup.parent : null;
