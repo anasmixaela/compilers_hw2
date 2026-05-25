@@ -52,11 +52,6 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
                 if (m.locals.containsKey(name)) {
                     return m.locals.get(name);
                 }
-
-                // parameter lookup
-                if (m.parameters.containsKey(name)) {
-                    return m.parameters.get(name);
-                }
             }
         }
 
@@ -125,12 +120,16 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(MainClass n, String argu) {
 
-        // set current compilation context to main class
         currentClass = n.f1.f0.tokenImage;
         currentMethod = "main";
 
-        // type check main method body
+        // type check variable declarations
         n.f14.accept(this, argu);
+
+        // type check statements
+        n.f15.accept(this, argu);
+
+        currentMethod = null;
 
         return null;
     }
@@ -193,6 +192,8 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
                 "Error: return type mismatch in method " + currentMethod
             );
         }
+
+        currentMethod = null;
 
         return null;
     }

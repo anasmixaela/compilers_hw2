@@ -54,6 +54,26 @@ public class SymbolTable {
             return true;
         }
 
+        // primitive and array types do not participate in inheritance
+        if (child.equals("int") ||
+            child.equals("boolean") ||
+            child.equals("int[]") ||
+            child.equals("String[]") ||
+            parent.equals("int") ||
+            parent.equals("boolean") ||
+            parent.equals("int[]") ||
+            parent.equals("String[]")) {
+
+            return false;
+        }
+
+        // unknown classes are invalid
+        if (!classes.containsKey(child) ||
+            !classes.containsKey(parent)) {
+
+            return false;
+        }
+
         // walk up the inheritance chain to find compatibility
         ClassInfo current = classes.get(child);
 
@@ -81,35 +101,11 @@ public class SymbolTable {
         MethodInfo b
     ) {
 
-        // different method names never conflict
-        if (!a.name.equals(b.name)) {
-            return false;
-        }
+        // miniJava does not support overloading
+        // any same-name method with different signature is illegal
 
-        // different parameter counts are valid overloading cases
-        if (a.paramTypes.size() != b.paramTypes.size()) {
-            return false;
-        }
+        return a.name.equals(b.name);
 
-        // compare parameter types position by position
-        for (int i = 0; i < a.paramTypes.size(); i++) {
-
-            String typeA = a.paramTypes.get(i);
-            String typeB = b.paramTypes.get(i);
-
-            // parameters must be comparable through inheritance
-            boolean comparable =
-                isSubtype(typeA, typeB) ||
-                isSubtype(typeB, typeA);
-
-            // if any position is unrelated then methods are considered distinct
-            if (!comparable) {
-                return false;
-            }
-        }
-
-        // all parameters compatible means conflict exists
-        return true;
     }
 
     // validates the entire inheritance graph for correctness

@@ -58,7 +58,7 @@ public class Main {
                         String fullMethodName = entry.getKey();
 
                         // skip main method because it is not part of vtable layout
-                        if (fullMethodName.contains(".main")) {
+                        if (fullMethodName.equals("main()")) {
                             continue;
                         }
 

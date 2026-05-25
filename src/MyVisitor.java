@@ -16,6 +16,39 @@ public class MyVisitor extends GJDepthFirst<String, String> {
     private MethodInfo currentMethod = null;
 
     @Override
+    public String visit(MainClass n, String argu) {
+
+        String className = n.f1.f0.tokenImage;
+
+        st.addClass(className, null);
+
+        currentClass = className;
+
+        ClassInfo ci = st.classes.get(className);
+
+        currentMethod = new MethodInfo("main", "void");
+
+        // add String[] args parameter
+        String argName = n.f11.f0.tokenImage;
+
+        currentMethod.parameters.put(argName, "String[]");
+        currentMethod.locals.put(argName, "String[]");
+        currentMethod.paramTypes.add("String[]");
+
+        ci.methods.put("main()", currentMethod);
+
+        // visit variable declarations inside main
+        n.f14.accept(this, argu);
+
+        // visit statements inside main
+        n.f15.accept(this, argu);
+
+        currentMethod = null;
+
+        return null;
+    }
+
+    @Override
     public String visit(ClassDeclaration n, String argu) {
 
         // extract class name from AST node
@@ -43,6 +76,12 @@ public class MyVisitor extends GJDepthFirst<String, String> {
         String className = n.f1.f0.tokenImage;
         String parentName = n.f3.f0.tokenImage;
 
+        if (!st.classes.containsKey(parentName)) {
+            throw new RuntimeException(
+                "Error: unknown parent class " + parentName
+            );
+        }
+
         // register subclass with inheritance relationship
         st.addClass(className, parentName);
 
@@ -52,6 +91,12 @@ public class MyVisitor extends GJDepthFirst<String, String> {
 
         ClassInfo child = st.classes.get(className);
         ClassInfo parent = st.classes.get(parentName);
+
+        if (parent == null) {
+            throw new RuntimeException(
+                "Internal error: parent class not registered: " + parentName
+            );
+        }
 
         // inherit offset counters from parent class
         // ensures correct memory layout for fields and methods
@@ -83,8 +128,12 @@ public class MyVisitor extends GJDepthFirst<String, String> {
         if (currentMethod != null) {
 
             // detect duplicate local declarations
-            if (currentMethod.locals.containsKey(name)) {
-                throw new RuntimeException("Error: duplicate local variable " + name);
+            if (currentMethod.locals.containsKey(name) ||
+                currentMethod.parameters.containsKey(name)) {
+
+                throw new RuntimeException(
+                    "Error: duplicate local variable " + name
+                );
             }
 
             // store local variable in current method scope
@@ -96,9 +145,6 @@ public class MyVisitor extends GJDepthFirst<String, String> {
 
             // detect duplicate field declarations
             if (ci.fields.containsKey(name)) {
-
-                System.err.println("Error: duplicate field " + name);
-
                 throw new RuntimeException("Error: duplicate field " + name);
             }
 
@@ -140,6 +186,18 @@ public class MyVisitor extends GJDepthFirst<String, String> {
         // check for duplicate method definitions in same class
         if (ci.methods.containsKey(signature)) {
             throw new RuntimeException("Error: duplicate method " + signature);
+        }
+
+        // MiniJava does not support overloading inside same class
+        for (MethodInfo existing : ci.methods.values()) {
+
+            if (existing.name.equals(methodName) &&
+                !existing.paramTypes.equals(currentMethod.paramTypes)) {
+
+                throw new RuntimeException(
+                    "Error: illegal overload for method " + methodName
+                );
+            }
         }
 
         boolean isOverride = false;
@@ -215,6 +273,7 @@ public class MyVisitor extends GJDepthFirst<String, String> {
 
         // visit method body (locals, statements, etc)
         n.f7.accept(this, argu);
+        n.f8.accept(this, argu);
 
         // reset method context after finishing traversal
         currentMethod = null;
@@ -238,7 +297,7 @@ public class MyVisitor extends GJDepthFirst<String, String> {
         currentMethod.parameters.put(name, type);
         currentMethod.paramTypes.add(type);
 
-        // parameters are also visible as local variables
+        // parameters are visible as locals
         currentMethod.locals.put(name, type);
 
         return null;
