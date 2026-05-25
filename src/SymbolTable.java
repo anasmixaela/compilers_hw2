@@ -4,117 +4,134 @@ import java.util.Map;
 
 public class SymbolTable {
 
-    // stores all program classes
+    // main symbol table structure that stores all classes found in the program
+    // uses linkedhashmap to preserve insertion order for deterministic output
     Map<String, ClassInfo> classes = new LinkedHashMap<>();
 
-    // add new class to symbol table
+    // adds a new class entry to the symbol table
+    // also checks for duplicate class definitions to avoid semantic errors
     public void addClass(String name, String parent) {
 
+        // prevent redefinition of an already declared class
         if (classes.containsKey(name)) {
 
             throw new RuntimeException("Error: duplicate class " + name);
         }
 
+        // create and store class metadata including inheritance info
         classes.put(name, new ClassInfo(name, parent));
     }
 
-    // returns field size in bytes
+    // returns memory size in bytes for a given type
+    // used during offset computation for fields and parameters
     public int getTypeSize(String type) {
 
+        // integer type occupies 4 bytes
         if (type.equals("int")) {
             return 4;
         }
 
+        // boolean type occupies 1 byte
         if (type.equals("boolean")) {
             return 1;
         }
 
-        // arrays and objects are pointers
+        // object references and arrays are treated as pointers
         return 8;
     }
 
-    // checks inheritance relationship
+    // checks whether child type can be assigned to parent type
+    // implements basic inheritance-based subtype checking
     public boolean isSubtype(String child, String parent) {
 
+        // null types are considered invalid
         if (child == null || parent == null) {
             return false;
         }
 
-        // same type
+        // identical types are always compatible
         if (child.equals(parent)) {
             return true;
         }
 
-        // walk inheritance chain
+        // walk up the inheritance chain to find compatibility
         ClassInfo current = classes.get(child);
 
         while (current != null) {
 
+            // if direct parent matches target type, it is a subtype
             if (current.parent != null &&
                 current.parent.equals(parent)) {
 
                 return true;
             }
 
+            // move one level up in the hierarchy
             current = classes.get(current.parent);
         }
 
+        // no match found in inheritance chain
         return false;
     }
 
-    // checks if two methods create illegal overload
+    // checks whether two methods conflict under overloading rules
+    // used to detect illegal method redeclarations
     boolean methodsConflict(
         MethodInfo a,
         MethodInfo b
     ) {
 
-        // different names are always ok
+        // different method names never conflict
         if (!a.name.equals(b.name)) {
             return false;
         }
 
-        // different argument count is always ok
+        // different parameter counts are valid overloading cases
         if (a.paramTypes.size() != b.paramTypes.size()) {
             return false;
         }
 
-        // check if all positions are comparable
+        // compare parameter types position by position
         for (int i = 0; i < a.paramTypes.size(); i++) {
 
             String typeA = a.paramTypes.get(i);
             String typeB = b.paramTypes.get(i);
 
+            // parameters must be comparable through inheritance
             boolean comparable =
                 isSubtype(typeA, typeB) ||
                 isSubtype(typeB, typeA);
 
-            // one unrelated position means legal overload
+            // if any position is unrelated then methods are considered distinct
             if (!comparable) {
                 return false;
             }
         }
 
-        // all positions comparable -> illegal overlap
+        // all parameters compatible means conflict exists
         return true;
     }
 
-    // validates inheritance graph
+    // validates the entire inheritance graph for correctness
+    // ensures no missing parents and no cyclic inheritance
     public void validateInheritance() {
 
+        // iterate through all declared classes
         for (ClassInfo ci : classes.values()) {
 
-            // parent must exist
+            // ensure parent class exists in symbol table
             if (ci.parent != null &&
                 !classes.containsKey(ci.parent)) {
 
                 throw new RuntimeException("Error: unknown parent class " + ci.parent);
             }
 
-            // detect inheritance cycles
+            // detect inheritance cycles by walking up parent chain
             String current = ci.parent;
 
             while (current != null) {
 
+                // if we return to original class then cycle exists
                 if (current.equals(ci.name)) {
 
                     throw new RuntimeException("Error: cyclic inheritance");
@@ -132,35 +149,35 @@ public class SymbolTable {
     }
 }
 
-// stores information for one class
+// holds all semantic information about a single class
 class ClassInfo {
 
-    // class name
+    // name of the class
     public String name;
 
-    // parent class name
+    // name of parent class if inheritance exists
     public String parent;
 
-    // field name -> type
+    // maps field names to their types
     public LinkedHashMap<String, String> fields =
         new LinkedHashMap<>();
 
-    // method signature -> method info
+    // maps method signatures to method metadata
     public LinkedHashMap<String, MethodInfo> methods =
         new LinkedHashMap<>();
 
-    // field offsets
+    // computed memory offsets for fields
     public LinkedHashMap<String, Integer> fieldOffsets =
         new LinkedHashMap<>();
 
-    // method offsets
+    // computed memory offsets for methods
     public LinkedHashMap<String, Integer> methodOffsets =
         new LinkedHashMap<>();
 
-    // next available field offset
+    // tracks next available offset for fields
     public int nextFieldOffset = 0;
 
-    // next available method offset
+    // tracks next available offset for methods
     public int nextMethodOffset = 0;
 
     public ClassInfo(String name, String parent) {
@@ -170,24 +187,24 @@ class ClassInfo {
     }
 }
 
-// stores information for one method
+// holds all semantic information about a single method
 class MethodInfo {
 
-    // method name
+    // method identifier (without parameters)
     public String name;
 
-    // method return type
+    // return type of the method
     public String returnType;
 
-    // ordered parameter types
+    // ordered list of parameter types for signature checking
     public ArrayList<String> paramTypes =
         new ArrayList<>();
 
-    // parameter name -> type
+    // maps parameter names to their types
     public LinkedHashMap<String, String> parameters =
         new LinkedHashMap<>();
 
-    // local variable name -> type
+    // maps local variable names to their types
     public LinkedHashMap<String, String> locals =
         new LinkedHashMap<>();
 
@@ -200,7 +217,7 @@ class MethodInfo {
         this.returnType = returnType;
     }
 
-    // creates unique method signature
+    // builds a unique method signature string used for comparison
     public String getSignature() {
 
         StringBuilder sb = new StringBuilder();

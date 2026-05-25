@@ -1,15 +1,25 @@
 # compile everything
 default:
-	javac src/*.java src/syntaxtree/*.java src/visitor/*.java
+	javac -d out src/*.java src/syntaxtree/*.java src/visitor/*.java
 
-# clean up .class files if needed
+# clean
 clean:
-	rm -f src/*.class src/syntaxtree/*.class src/visitor/*.class
+	rm -rf out
 
-# run a single test (Factorial)
-run-factorial: default
-	java -cp src Main official-tests/minijava-examples-new/Factorial.java
+# run single test
+run-test: default
+	java -cp out Main $(FILE)
 
-# execute all new valid examples at once
-run-all: default
-	java -cp src Main official-tests/minijava-examples-new/*.java
+# run all extra tests
+run-extra: default
+	for f in official-tests/minijava-examples-new/minijava-extra/*.java; do \
+		echo "Running $$f"; \
+		java -cp out Main "$$f"; \
+	done
+
+# run all error tests
+run-errors: default
+	for f in official-tests/minijava-examples-new/minijava-error-extra/*.java; do \
+		echo "Running $$f"; \
+		java -cp out Main "$$f"; \
+	done
