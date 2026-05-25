@@ -10,30 +10,41 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         this.st = st;
     }
 
+    private MethodInfo getCurrentMethodInfo() {
+
+        ClassInfo ci = st.classes.get(currentClass);
+
+        if (ci == null) {
+            return null;
+        }
+
+        for (MethodInfo m : ci.methods.values()) {
+            if (m.name.equals(currentMethod)) {
+                return m;
+            }
+        }
+
+        return null;
+    }
+
     private String lookupVariable(String name) {
 
-        // check locals first
         if (currentMethod != null) {
 
-            ClassInfo ci = st.classes.get(currentClass);
+            MethodInfo m = getCurrentMethodInfo();
 
-            if (ci != null) {
+            if (m != null) {
 
-                for (MethodInfo m : ci.methods.values()) {
+                if (m.locals.containsKey(name)) {
+                    return m.locals.get(name);
+                }
 
-                    if (m.name.equals(currentMethod)) {
-
-                        if (m.locals.containsKey(name)) {
-                            return m.locals.get(name);
-                        }
-
-                        break;
-                    }
+                if (m.parameters.containsKey(name)) {
+                    return m.parameters.get(name);
                 }
             }
         }
 
-        // check fields (inheritance chain)
         String cName = currentClass;
 
         while (cName != null) {
@@ -52,6 +63,41 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         return null;
     }
 
+    // searches method in class hierarchy
+    private MethodInfo lookupMethod(
+        String className,
+        String methodName
+    ) {
+
+        // walk inheritance chain
+        while (className != null) {
+
+            ClassInfo ci =
+                st.classes.get(className);
+
+            if (ci != null) {
+
+                // search methods
+                for (MethodInfo m :
+                    ci.methods.values()) {
+
+                    // found matching method
+                    if (m.name.equals(methodName)) {
+                        return m;
+                    }
+                }
+
+                // continue to parent
+                className = ci.parent;
+            }
+            else {
+                className = null;
+            }
+        }
+
+        return null;
+    }
+
     @Override
     public String visit(Goal n, String argu) {
         n.f0.accept(this, argu);
@@ -60,38 +106,42 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     }
 
     @Override
+    public String visit(Statement n, String argu) {
+        return n.f0.accept(this, argu);
+    }
+
+    @Override
     public String visit(MainClass n, String argu) {
+
         currentClass = n.f1.f0.tokenImage;
         currentMethod = "main";
-        if (n.f14.present()) {
-            for (int i = 0; i < n.f14.size(); i++) {
-                n.f14.nodes.get(i).accept(this, argu);
-            }
-        }
+
+        n.f14.accept(this, argu);
+
         return null;
     }
 
     @Override
     public String visit(ClassDeclaration n, String argu) {
+
+        // enter class
         currentClass = n.f1.f0.tokenImage;
+
         currentMethod = null;
-        if (n.f4.present()) {
-            for (int i = 0; i < n.f4.size(); i++) {
-                n.f4.nodes.get(i).accept(this, argu);
-            }
-        }
+
+        n.f4.accept(this, argu);
         return null;
     }
 
     @Override
     public String visit(ClassExtendsDeclaration n, String argu) {
+
+        // enter subclass
         currentClass = n.f1.f0.tokenImage;
+
         currentMethod = null;
-        if (n.f6.present()) {
-            for (int i = 0; i < n.f6.size(); i++) {
-                n.f6.nodes.get(i).accept(this, argu);
-            }
-        }
+
+        n.f6.accept(this, argu);
         return null;
     }
 
@@ -102,6 +152,10 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
 
         String declaredType =
             n.f1.accept(this, argu);
+
+        if (n.f7.present()) {
+            n.f7.accept(this, argu);
+        }
 
         if (n.f8.present()) {
             for (int i = 0; i < n.f8.size(); i++) {
@@ -120,12 +174,6 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             );
         }
 
-        return null;
-    }
-
-    @Override
-    public String visit(Statement n, String argu) {
-        n.f0.accept(this, argu);
         return null;
     }
 
@@ -170,25 +218,74 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     }
 
     @Override
-    public String visit(PrimaryExpression n, String argu) {
-        String t = n.f0.accept(this, argu);
-        return t;
+    public String visit(ExpressionList n, String argu) {
+
+        String result =
+            n.f0.accept(this, argu);
+
+        String tail =
+            n.f1.accept(this, argu);
+
+        if (tail != null) {
+            result += tail;
+        }
+
+        return result;
     }
 
     @Override
-    public String visit(Identifier n, String argu) {
+    public String visit(ExpressionTail n, String argu) {
 
-        String name = n.f0.tokenImage;
+        StringBuilder sb =
+            new StringBuilder();
 
-        String varType = lookupVariable(name);
+        for (int i = 0; i < n.f0.size(); i++) {
 
-        if (varType != null) {
-            return varType;
+            sb.append(
+                n.f0.elementAt(i).accept(this, argu)
+            );
         }
 
-        throw new RuntimeException(
-            "Error: Variable " + name + " is not declared."
-        );
+        return sb.toString();
+    }
+
+    @Override
+    public String visit(ExpressionTerm n, String argu) {
+
+        return "," +
+            n.f1.accept(this, argu);
+    }
+
+    @Override
+    public String visit(Clause n, String argu) {
+        return n.f0.accept(this, argu);
+    }
+
+    @Override
+    public String visit(Type n, String argu) {
+        return n.f0.accept(this, argu);
+    }
+
+    @Override
+    public String visit(IntegerType n, String argu) {
+        return "int";
+    }
+
+    @Override
+    public String visit(BooleanType n, String argu) {
+        return "boolean";
+    }
+
+    @Override
+    public String visit(ArrayType n, String argu) {
+        return "int[]";
+    }
+
+    @Override
+    public String visit(PrimaryExpression n, String argu) {
+
+        // just return child expression type
+        return n.f0.accept(this, argu);
     }
 
     @Override
@@ -197,8 +294,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String left = n.f0.accept(this, argu);
         String right = n.f2.accept(this, argu);
 
-        if (left == null || right == null ||
-            !"int".equals(left) || !"int".equals(right)) {
+        if (!"int".equals(left) || !"int".equals(right)) {
             throw new RuntimeException("Error: + operator requires int operands.");
         }
 
@@ -211,8 +307,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String left = n.f0.accept(this, argu);
         String right = n.f2.accept(this, argu);
 
-        if (left == null || right == null ||
-            !"int".equals(left) || !"int".equals(right)) {
+        if (!"int".equals(left) || !"int".equals(right)) {
             throw new RuntimeException("Error: - operator requires int operands.");
         }
 
@@ -225,8 +320,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String left = n.f0.accept(this, argu);
         String right = n.f2.accept(this, argu);
 
-        if (left == null || right == null ||
-            !"int".equals(left) || !"int".equals(right)) {
+        if (!"int".equals(left) || !"int".equals(right)) {
             throw new RuntimeException("Error: * operator requires int operands.");
         }
 
@@ -239,8 +333,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String left = n.f0.accept(this, argu);
         String right = n.f2.accept(this, argu);
 
-        if (left == null || right == null ||
-            !"int".equals(left) || !"int".equals(right)) {
+        if (!"int".equals(left) || !"int".equals(right)) {
             throw new RuntimeException("Error: < operator requires int operands.");
         }
 
@@ -274,39 +367,81 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(MessageSend n, String argu) {
 
-        String objType = n.f0.accept(this, argu);
+        String objType =
+            n.f0.accept(this, argu);
 
-        if (objType == null ||
-            objType.equals("int") ||
-            objType.equals("boolean") ||
-            objType.equals("int[]")) {
+        if ("int".equals(objType) ||
+            "boolean".equals(objType) ||
+            "int[]".equals(objType)) {
+
             throw new RuntimeException(
-                "Error: message send on non-object type."
+                "Error: message send on non-object."
             );
         }
 
-        String mName = n.f2.f0.tokenImage;
+        String methodName =
+            n.f2.f0.tokenImage;
 
-        String current = objType;
+        MethodInfo method =
+            lookupMethod(objType, methodName);
 
-        while (current != null) {
+        if (method == null) {
 
-            ClassInfo lookup = st.classes.get(current);
-
-            if (lookup != null) {
-
-                for (MethodInfo m : lookup.methods.values()) {
-
-                    if (m.name.equals(mName)) {
-                        return m.returnType;
-                    }
-                }
-            }
-
-            current = (lookup != null) ? lookup.parent : null;
+            throw new RuntimeException(
+                "Error: method " +
+                methodName +
+                " not found."
+            );
         }
 
-        throw new RuntimeException("Error: method " + mName + " not found in class " + objType);
+        // collect actual argument types
+        java.util.ArrayList<String> argTypes =
+            new java.util.ArrayList<>();
+
+        if (n.f4.present()) {
+
+            String args =
+                n.f4.accept(this, argu);
+
+            if (args != null && !args.isEmpty()) {
+
+                String[] split =
+                    args.split(",");
+
+                for (String s : split) {
+                    argTypes.add(s.trim());
+                }
+            }
+        }
+
+        // check argument count
+        if (argTypes.size() != method.paramTypes.size()) {
+
+            throw new RuntimeException(
+                "Error: wrong number of arguments in call to "
+                + methodName
+            );
+        }
+
+        // check argument types
+        for (int i = 0; i < argTypes.size(); i++) {
+
+            String actual =
+                argTypes.get(i);
+
+            String expected =
+                method.paramTypes.get(i);
+
+            if (!st.isSubtype(actual, expected)) {
+
+                throw new RuntimeException(
+                    "Error: argument type mismatch in call to "
+                    + methodName
+                );
+            }
+        }
+
+        return method.returnType;
     }
 
     @Override
@@ -386,7 +521,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String cond =
             n.f2.accept(this, argu);
 
-        if (!cond.equals("boolean")) {
+        if (!"boolean".equals(cond)) {
 
             throw new RuntimeException(
                 "Error: if condition must be boolean."
@@ -405,7 +540,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String cond =
             n.f2.accept(this, argu);
 
-        if (!cond.equals("boolean")) {
+        if (!"boolean".equals(cond)) {
 
             throw new RuntimeException(
                 "Error: while condition must be boolean."
@@ -423,7 +558,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String exprType =
             n.f2.accept(this, argu);
 
-        if (!exprType.equals("int")) {
+        if (!"int".equals(exprType)) {
 
             throw new RuntimeException(
                 "Error: System.out.println requires int."
@@ -431,5 +566,86 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         }
 
         return null;
+    }
+
+    @Override
+    public String visit(AndExpression n, String argu) {
+
+        String left = n.f0.accept(this, argu);
+        String right = n.f2.accept(this, argu);
+
+        // both operands must be boolean
+        if (!"boolean".equals(left) ||
+            !"boolean".equals(right)) {
+
+            throw new RuntimeException(
+                "Error: && operator requires boolean operands."
+            );
+        }
+
+        return "boolean";
+    }
+
+    @Override
+    public String visit(NotExpression n, String argu) {
+
+        String type = n.f1.accept(this, argu);
+
+        // ! only works on booleans
+        if (!type.equals("boolean")) {
+
+            throw new RuntimeException(
+                "Error: ! operator requires boolean."
+            );
+        }
+
+        return "boolean";
+    }
+
+    @Override
+    public String visit(BracketExpression n, String argu) {
+
+        // brackets do not change type
+        return n.f1.accept(this, argu);
+    }
+
+    @Override
+    public String visit(ArrayAllocationExpression n, String argu) {
+
+        String sizeType = n.f3.accept(this, argu);
+
+        // array size must be int
+        if (!sizeType.equals("int")) {
+
+            throw new RuntimeException(
+                "Error: array size must be int."
+            );
+        }
+
+        return "int[]";
+    }
+
+    @Override
+    public String visit(Identifier n, String argu) {
+
+        // get identifier name
+        String name = n.f0.tokenImage;
+
+        // search variable type
+        String type = lookupVariable(name);
+
+        // variable found
+        if (type != null) {
+            return type;
+        }
+
+        // maybe identifier is a class name
+        if (st.classes.containsKey(name)) {
+            return name;
+        }
+
+        throw new RuntimeException(
+            "Error: variable " + name + " is not declared."
+        );
     }
 }
