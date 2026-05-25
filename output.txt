@@ -1,0 +1,17 @@
+javac src/*.java src/syntaxtree/*.java src/visitor/*.java
+java -cp src Main official-tests/minijava-examples-new/*.java
+Error in file official-tests/minijava-examples-new/BinaryTree.java: Error: Invalid expression type.
+Error in file official-tests/minijava-examples-new/BubbleSort-error.java: Cannot invoke "String.equals(Object)" because "<local3>" is null
+Error in file official-tests/minijava-examples-new/BubbleSort.java: Cannot invoke "String.equals(Object)" because "<local3>" is null
+Error in file official-tests/minijava-examples-new/Factorial-error.java: Error: Invalid expression type.
+Error in file official-tests/minijava-examples-new/Factorial.java: Error: Invalid expression type.
+Error in file official-tests/minijava-examples-new/LinearSearch-error.java: Cannot invoke "String.equals(Object)" because "<local3>" is null
+Error in file official-tests/minijava-examples-new/LinearSearch.java: Cannot invoke "String.equals(Object)" because "<local3>" is null
+Error in file official-tests/minijava-examples-new/LinkedList-error.java: Error: Invalid expression type.
+Error in file official-tests/minijava-examples-new/LinkedList.java: Error: Invalid expression type.
+Error in file official-tests/minijava-examples-new/MoreThan4-error.java: Cannot invoke "String.equals(Object)" because "<local3>" is null
+Error in file official-tests/minijava-examples-new/MoreThan4.java: Cannot invoke "String.equals(Object)" because "<local3>" is null
+Error in file official-tests/minijava-examples-new/QuickSort-error.java: Cannot invoke "String.equals(Object)" because "<local3>" is null
+Error in file official-tests/minijava-examples-new/QuickSort.java: Cannot invoke "String.equals(Object)" because "<local3>" is null
+Error in file official-tests/minijava-examples-new/TreeVisitor-error.java: Error: Invalid expression type.
+Error in file official-tests/minijava-examples-new/TreeVisitor.java: Error: Invalid expression type.

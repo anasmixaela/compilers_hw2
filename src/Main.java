@@ -41,40 +41,48 @@ public class Main {
                         System.out.println(entry.getKey() + " : " + entry.getValue());
                     }
                     
-                    // print method offsets including overrides
+                    // print method offsets excluding overrides
                     for (Map.Entry<String, Integer> entry : ci.methodOffsets.entrySet()) {
 
                         String fullMethodName = entry.getKey();
 
-                        // skip main method
+                        // skip main
                         if (fullMethodName.contains(".main")) {
                             continue;
                         }
 
-                        // skip overridden methods
-                        boolean alreadyPrinted = false;
+                        boolean isOverride = false;
 
-                        if (ci.parent != null) {
+                        // check parent chain
+                        String parentName = ci.parent;
 
-                            ClassInfo parentClass = st.classes.get(ci.parent);
+                        while (parentName != null) {
 
-                            while (parentClass != null) {
+                            ClassInfo parentClass =
+                                st.classes.get(parentName);
 
-                                if (parentClass.methodOffsets.containsValue(entry.getValue())) {
-                                    alreadyPrinted = true;
-                                    break;
-                                }
-
-                                if (parentClass.parent == null) {
-                                    break;
-                                }
-
-                                parentClass = st.classes.get(parentClass.parent);
+                            if (parentClass == null) {
+                                break;
                             }
+
+                            // same signature exists in parent
+                            if (parentClass.methodOffsets.containsKey(fullMethodName)) {
+
+                                isOverride = true;
+                                break;
+                            }
+
+                            parentName = parentClass.parent;
                         }
 
-                        if (!alreadyPrinted) {
-                            System.out.println(fullMethodName + " : " + entry.getValue());
+                        // print only non-overridden methods
+                        if (!isOverride) {
+
+                            System.out.println(
+                                fullMethodName +
+                                " : " +
+                                entry.getValue()
+                            );
                         }
                     }
                 }
