@@ -100,14 +100,9 @@ public class MyVisitor extends GJDepthFirst<String, String> {
 
         // inherit offset counters from parent class
         // ensures correct memory layout for fields and methods
-        if (parent != null) {
+        child.nextFieldOffset = parent.nextFieldOffset;
 
-            child.nextFieldOffset =
-                parent.nextFieldOffset;
-
-            child.nextMethodOffset =
-                parent.nextMethodOffset;
-        }
+        child.nextMethodOffset = parent.nextMethodOffset;
 
         // continue visiting subtree
         super.visit(n, argu);
@@ -271,8 +266,10 @@ public class MyVisitor extends GJDepthFirst<String, String> {
         // store method metadata in class
         ci.methods.put(signature, currentMethod);
 
-        // visit method body (locals, statements, etc)
+        // visit local variable declarations
         n.f7.accept(this, argu);
+
+        // visit method statements
         n.f8.accept(this, argu);
 
         // reset method context after finishing traversal

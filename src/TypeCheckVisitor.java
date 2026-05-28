@@ -12,6 +12,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     // keeps track of the currently active method during traversal
     private String currentMethod = null;
 
+    // initializes the type checker with the symbol table built in the previous phase
     public TypeCheckVisitor(SymbolTable st) {
         this.st = st;
     }
@@ -28,6 +29,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             );
         }
 
+        // search for method metadata in current class
         for (MethodInfo m : ci.methods.values()) {
             if (m.name.equals(currentMethod)) {
                 return m;
@@ -67,7 +69,9 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
                 return ci.fields.get(name);
             }
 
-            cName = (ci != null) ? ci.parent : null;
+            cName = (ci != null) 
+                ? ci.parent 
+                : null;
         }
 
         // variable not found in any scope
@@ -83,28 +87,24 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
 
             ClassInfo ci =
                 st.classes.get(className);
-            
-            if (ci != null) {
 
-                // check all methods in current class
-                for (MethodInfo m : ci.methods.values()) {
+            if (ci == null) {
+                break;
+            }
 
-                    if (m.name.equals(methodName)) {
-                        return m;
-                    }
+            for (MethodInfo m : ci.methods.values()) {
+                if (m.name.equals(methodName)) {
+                    return m;
                 }
+            }
 
-                // move to parent class
-                className = ci.parent;
-            }
-            else {
-                className = null;
-            }
+            className = ci.parent;
         }
 
         return null;
     }
 
+    // entry point for type checking traversal- visits main class fisrt then all other classes
     @Override
     public String visit(Goal n, String argu) {
         n.f0.accept(this, argu);
@@ -112,11 +112,13 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         return null;
     }
 
+    // forwards type checking to the specific statement subtype (assignment, if, while, print , etc.)
     @Override
     public String visit(Statement n, String argu) {
         return n.f0.accept(this, argu);
     }
 
+    // type check expressions and return their evaluated type
     @Override
     public String visit(MainClass n, String argu) {
 
@@ -134,6 +136,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         return null;
     }
 
+    // type check class declarations and their members
     @Override
     public String visit(ClassDeclaration n, String argu) {
 
@@ -144,11 +147,13 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             throw new RuntimeException("Unknown class: " + currentClass);
         }
 
+        // type check fields and methods
         n.f4.accept(this, argu);
 
         return null;
     }
 
+    // type check subclass declarations and their members to ensurw inheritance rules are respected
     @Override
     public String visit(ClassExtendsDeclaration n, String argu) {
 
@@ -159,12 +164,13 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             throw new RuntimeException("Unknown class: " + currentClass);
         }
 
-        // traverse subclass body
+        // type check fields and methods
         n.f6.accept(this, argu);
 
         return null;
     }
 
+    // type check method declarations including return type parameter types and method body
     @Override
     public String visit(MethodDeclaration n, String argu) {
 
@@ -175,8 +181,10 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String declaredType =
             n.f1.accept(this, argu);
 
-        // visit parameters and local declarations
+        // type check local variable declarations
         n.f7.accept(this, argu);
+
+        // type check method statements
         n.f8.accept(this, argu);
 
         // evaluate actual return expression type
@@ -198,6 +206,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         return null;
     }
 
+    // type check variable declarations in method bodies and class fields for duplicates and correct type usage
     @Override
     public String visit(AssignmentStatement n, String argu) {
 
@@ -233,6 +242,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         return null;
     }
 
+    // evaluates and returns the type of the contained expression
     @Override
     public String visit(Expression n, String argu) {
         return n.f0.accept(this, argu);
@@ -241,22 +251,24 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(ExpressionList n, String argu) {
 
+        // evaluate the first expr in arg list
         String result =
             n.f0.accept(this, argu);
 
+            // evaluate remaining expr if they exist
         String tail =
             n.f1.accept(this, argu);
 
-        if (tail != null) {
-            result += tail;
-        }
-
-        return result;
+            // combine all arg types inone string (with commas)
+        return (tail == null) 
+            ? result 
+            : result + tail;
     }
 
     @Override
     public String visit(ExpressionTail n, String argu) {
 
+        // collecting all additional expressions after the first one in a method cal
         StringBuilder sb =
             new StringBuilder();
 
@@ -272,16 +284,19 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
 
     @Override
     public String visit(ExpressionTerm n, String argu) {
+        // prepping comma to use for arg split
         return "," + n.f1.accept(this, argu);
     }
 
     @Override
     public String visit(Clause n, String argu) {
+        // evaluate contained bool clause expr
         return n.f0.accept(this, argu);
     }
 
     @Override
     public String visit(Type n, String argu) {
+        // forward visit to the specific type node
         return n.f0.accept(this, argu);
     }
 
@@ -302,15 +317,18 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
 
     @Override
     public String visit(PrimaryExpression n, String argu) {
+        // evaluate contained primary expr
         return n.f0.accept(this, argu);
     }
 
     @Override
     public String visit(PlusExpression n, String argu) {
 
+        // both operants of addition
         String left = n.f0.accept(this, argu);
         String right = n.f2.accept(this, argu);
 
+        // both must be int
         if (!"int".equals(left) || !"int".equals(right)) {
             throw new RuntimeException("Error: + operator requires int operands.");
         }
@@ -321,9 +339,11 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(MinusExpression n, String argu) {
 
+        // both operants of subtraction
         String left = n.f0.accept(this, argu);
         String right = n.f2.accept(this, argu);
 
+        // only ints
         if (!"int".equals(left) || !"int".equals(right)) {
             throw new RuntimeException("Error: - operator requires int operands.");
         }
@@ -334,9 +354,11 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(TimesExpression n, String argu) {
 
+        // multiplication operands
         String left = n.f0.accept(this, argu);
         String right = n.f2.accept(this, argu);
 
+        // both int
         if (!"int".equals(left) || !"int".equals(right)) {
             throw new RuntimeException("Error: * operator requires int operands.");
         }
@@ -347,9 +369,11 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(CompareExpression n, String argu) {
 
+        // comparison operands
         String left = n.f0.accept(this, argu);
         String right = n.f2.accept(this, argu);
 
+        // both int
         if (!"int".equals(left) || !"int".equals(right)) {
             throw new RuntimeException("Error: < operator requires int operands.");
         }
@@ -357,13 +381,17 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         return "boolean";
     }
 
+    // integer literals always evaluate to int
     @Override public String visit(IntegerLiteral n, String argu) { return "int"; }
+    // true literal evaluates to boolean
     @Override public String visit(TrueLiteral n, String argu) { return "boolean"; }
+    // false literal evaluates to boolean
     @Override public String visit(FalseLiteral n, String argu) { return "boolean"; }
 
     @Override
     public String visit(ThisExpression n, String argu) {
 
+        //currentclass to become the resulting type
         if (currentClass == null) {
             throw new RuntimeException("Error: invalid use of this.");
         }
@@ -376,6 +404,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
 
         String className = n.f1.f0.tokenImage;
 
+        // object creation only valid for defined classes
         if (!st.classes.containsKey(className)) {
             throw new RuntimeException("Error: undefined class " + className);
         }
@@ -389,6 +418,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String objType =
             n.f0.accept(this, argu);
 
+        // primitive types and arrays cannot receive method calls
         if ("int".equals(objType) ||
             "boolean".equals(objType) ||
             "int[]".equals(objType)) {
@@ -399,21 +429,26 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String methodName =
             n.f2.f0.tokenImage;
 
+        // search for method in class hierarchy
         MethodInfo method =
             lookupMethod(objType, methodName);
 
+        // method must exist in object type
         if (method == null) {
             throw new RuntimeException("Error: method " + methodName + " not found.");
         }
 
+        // store evaluated arg types from method call
         java.util.ArrayList<String> argTypes =
             new java.util.ArrayList<>();
 
+        // process args if method call contains any
         if (n.f4.present()) {
 
             String args =
                 n.f4.accept(this, argu);
 
+            // split if comma separated
             if (args != null && !args.isEmpty()) {
 
                 String[] split = args.split(",");
@@ -424,12 +459,14 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             }
         }
 
+        // arg count compatibility
         if (argTypes.size() != method.paramTypes.size()) {
             throw new RuntimeException(
                 "Error: wrong number of arguments in call to " + methodName
             );
         }
 
+        // verufy each arg type against expected parameter type
         for (int i = 0; i < argTypes.size(); i++) {
 
             String actual = argTypes.get(i);
@@ -448,9 +485,11 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(ArrayLookup n, String argu) {
 
+        // array index and expression types
         String arrType = n.f0.accept(this, argu);
         String idxType = n.f2.accept(this, argu);
 
+        // left side must be an int array
         if (!arrType.equals("int[]")) {
             throw new RuntimeException("Error: array lookup on non-array type.");
         }
@@ -465,6 +504,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(ArrayLength n, String argu) {
 
+        // evaluate type before .length 
         String arrType = n.f0.accept(this, argu);
 
         if (!arrType.equals("int[]")) {
@@ -477,13 +517,16 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(ArrayAssignmentStatement n, String argu) {
 
+        // retrieve variable type for array being assigned to
         String varType =
             lookupVariable(n.f0.f0.tokenImage);
 
+        // assingment target must be an int array
         if (varType == null || !"int[]".equals(varType)) {
             throw new RuntimeException("Error: array assignment on non-array.");
         }
 
+        // evaluate index expr type
         String indexType =
             n.f2.accept(this, argu);
 
@@ -491,6 +534,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             throw new RuntimeException("Error: array index must be int.");
         }
 
+        // assinged value type
         String exprType = n.f5.accept(this, argu);
 
         if (!"int".equals(exprType)) {
@@ -510,6 +554,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             throw new RuntimeException("Error: if condition must be boolean.");
         }
 
+        // type check bith brakches
         n.f4.accept(this, argu);
         n.f6.accept(this, argu);
 
@@ -526,6 +571,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             throw new RuntimeException("Error: while condition must be boolean.");
         }
 
+        // type check loop body
         n.f4.accept(this, argu);
 
         return null;
@@ -537,6 +583,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
         String exprType =
             n.f2.accept(this, argu);
 
+        // minijava only allows printing ints
         if (!"int".equals(exprType)) {
             throw new RuntimeException("Error: System.out.println requires int.");
         }
@@ -547,6 +594,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(AndExpression n, String argu) {
 
+        // both loical operands
         String left = n.f0.accept(this, argu);
         String right = n.f2.accept(this, argu);
 
@@ -562,6 +610,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(NotExpression n, String argu) {
 
+        // expr after !
         String type = n.f1.accept(this, argu);
 
         if (!type.equals("boolean")) {
@@ -591,6 +640,7 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
     @Override
     public String visit(Identifier n, String argu) {
 
+        // iddentifier name from ast node
         String name = n.f0.tokenImage;
 
         // only lookup variables if we are inside a class
@@ -603,10 +653,12 @@ public class TypeCheckVisitor extends GJDepthFirst<String, String> {
             }
         }
 
+        // identfiers may also refer to class names
         if (st.classes.containsKey(name)) {
             return name;
         }
 
+        // no identfier was declared
         throw new RuntimeException("Error: variable " + name + " is not declared.");
     }
 }

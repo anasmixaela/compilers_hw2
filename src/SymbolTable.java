@@ -36,7 +36,7 @@ public class SymbolTable {
             return 1;
         }
 
-        // object references and arrays are treated as pointers
+        // reference types are represented as pointers
         return 8;
     }
 
@@ -102,8 +102,7 @@ public class SymbolTable {
     ) {
 
         // miniJava does not support overloading
-        // any same-name method with different signature is illegal
-
+        // any methods sharing the same name are considered conflicting
         return a.name.equals(b.name);
 
     }
@@ -200,7 +199,7 @@ class MethodInfo {
     public LinkedHashMap<String, String> parameters =
         new LinkedHashMap<>();
 
-    // maps local variable names to their types
+    // stores local variables and parameters visible in the method scope
     public LinkedHashMap<String, String> locals =
         new LinkedHashMap<>();
 
