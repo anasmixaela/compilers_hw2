@@ -42,6 +42,13 @@ This project is a MiniJava compiler frontend that performs:
 
 It is implemented using thw Visitor pattern and it works in multiple passes over the AST. It also uses ordered maps to keep the output consistent.
 
+The files that were created are:
+- src/Main.java
+- src/MyVisitor.java
+- src/SymbolTable.java
+- src/TypeCheckVisitor.java
+- Makefile
+
 
 ## Compilation Phases
 
